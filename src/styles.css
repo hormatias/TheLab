@@ -1,0 +1,283 @@
+@import "tailwindcss";
+
+@theme {
+  --radius: 0.5rem;
+}
+
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222.2 47.4% 11.2%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 47.4% 11.2%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 47.4% 11.2%;
+  --primary: 222.2 47.4% 11.2%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 222.2 47.4% 11.2%;
+  --radius: 0.5rem;
+  --chart-1: 12 76% 61%;
+  --chart-2: 173 58% 39%;
+  --chart-3: 197 37% 24%;
+  --chart-4: 43 74% 66%;
+  --chart-5: 27 87% 67%;
+}
+
+
+
+.dark {
+  --background: 222.2 47.4% 10.2%;
+  --foreground: 210 40% 98%;
+  --card: 222.2 47.4% 11.2%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222.2 47.4% 11.2%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 210 40% 98%;
+  --primary-foreground: 222.2 47.4% 11.2%;
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --ring: 212.7 26.8% 83.9%;
+  --chart-1: 220 70% 50%;
+  --chart-2: 160 60% 45%;
+  --chart-3: 30 80% 55%;
+  --chart-4: 280 65% 60%;
+  --chart-5: 340 75% 55%;
+}
+
+.bg-card{
+  background-color: hsl(var(--card));
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+/* Estilos para Markdown renderizado */
+.prose {
+  color: hsl(var(--foreground));
+}
+
+.prose h1 {
+  font-size: 2em;
+  font-weight: 700;
+  margin-top: 0;
+  margin-bottom: 0.5em;
+  line-height: 1.2;
+  color: hsl(var(--foreground));
+}
+
+.prose h2 {
+  font-size: 1.5em;
+  font-weight: 600;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+  color: hsl(var(--foreground));
+}
+
+.prose h3 {
+  font-size: 1.25em;
+  font-weight: 600;
+  margin-top: 1.25em;
+  margin-bottom: 0.5em;
+  line-height: 1.4;
+  color: hsl(var(--foreground));
+}
+
+.prose h4,
+.prose h5,
+.prose h6 {
+  font-size: 1em;
+  font-weight: 600;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  line-height: 1.5;
+  color: hsl(var(--foreground));
+}
+
+.prose p {
+  margin-top: 0;
+  margin-bottom: 1em;
+  line-height: 1.7;
+}
+
+.prose ul,
+.prose ol {
+  margin-top: 0;
+  margin-bottom: 1em;
+  padding-left: 1.5em;
+}
+
+.prose ul {
+  list-style-type: disc;
+}
+
+.prose ol {
+  list-style-type: decimal;
+}
+
+.prose li {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+}
+
+.prose li > p {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.prose code {
+  background-color: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  padding: 0.125em 0.375em;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+.prose pre {
+  background-color: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  padding: 1em;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin-top: 0;
+  margin-bottom: 1em;
+  line-height: 1.5;
+}
+
+.prose pre code {
+  background-color: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.875em;
+}
+
+.prose blockquote {
+  border-left: 4px solid hsl(var(--border));
+  padding-left: 1em;
+  margin-left: 0;
+  margin-right: 0;
+  margin-top: 1em;
+  margin-bottom: 1em;
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+}
+
+.prose a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.prose a:hover {
+  color: hsl(var(--primary));
+  opacity: 0.8;
+}
+
+.prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+.prose hr {
+  border: none;
+  border-top: 1px solid hsl(var(--border));
+  margin-top: 2em;
+  margin-bottom: 2em;
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1em;
+  margin-bottom: 1em;
+  font-size: 0.875em;
+}
+
+.prose thead {
+  border-bottom: 2px solid hsl(var(--border));
+}
+
+.prose th {
+  text-align: left;
+  font-weight: 600;
+  padding: 0.5em;
+  color: hsl(var(--foreground));
+}
+
+.prose td {
+  padding: 0.5em;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.prose tbody tr:hover {
+  background-color: hsl(var(--muted) / 0.5);
+}
+
+.prose strong {
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+.prose em {
+  font-style: italic;
+}
+
+/* Mobile-first: ajustes para pantallas pequeñas */
+@media (max-width: 640px) {
+  .prose {
+    font-size: 0.875rem;
+  }
+
+  .prose h1 {
+    font-size: 1.75em;
+  }
+
+  .prose h2 {
+    font-size: 1.5em;
+  }
+
+  .prose h3 {
+    font-size: 1.25em;
+  }
+
+  .prose pre {
+    padding: 0.75em;
+    font-size: 0.8125em;
+  }
+
+  .prose table {
+    font-size: 0.75em;
+  }
+
+  .prose th,
+  .prose td {
+    padding: 0.375em;
+  }
+}
