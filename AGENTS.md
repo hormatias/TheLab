@@ -55,6 +55,8 @@ Cada tipo tiene su `data` como JSONB. Estructura por tipo:
 ```json
 {
   "nombre": "string",
+  "tipo_cliente": "empresa | particular | null",
+  "descripcion": "string | null",
   "equipo": [
     {
       "nombre": "string",
@@ -64,6 +66,8 @@ Cada tipo tiene su `data` como JSONB. Estructura por tipo:
   ]
 }
 ```
+
+Si `tipo_cliente` es `"particular"`, el cliente no tiene equipo (la UI no muestra ni edita `equipo`; se guarda como `[]`) y sí tiene `descripcion`.
 
 ### miembro
 

@@ -17,7 +17,11 @@ export function ClienteDetail() {
   const [cliente, setCliente] = useState(null);
   const [proyectos, setProyectos] = useState([]);
   const [equipoLocal, setEquipoLocal] = useState([]);
+  const [tipoCliente, setTipoCliente] = useState("");
+  const [descripcionLocal, setDescripcionLocal] = useState("");
   const [savingEquipo, setSavingEquipo] = useState(false);
+  const [savingTipo, setSavingTipo] = useState(false);
+  const [savingDescripcion, setSavingDescripcion] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -39,8 +43,10 @@ export function ClienteDetail() {
           rol: m.rol ?? m.rango ?? "",
         }))
       );
+      setTipoCliente(cliente.tipo_cliente || "");
+      setDescripcionLocal(cliente.descripcion ?? "");
     }
-  }, [cliente?.id, cliente?.equipo]);
+  }, [cliente?.id, cliente?.equipo, cliente?.tipo_cliente, cliente?.descripcion]);
 
   async function loadCliente() {
     try {
@@ -88,6 +94,40 @@ export function ClienteDetail() {
       alert(`Error al guardar equipo: ${err.message}`);
     } finally {
       setSavingEquipo(false);
+    }
+  }
+
+  async function saveTipoCliente() {
+    const value = tipoCliente || null;
+    const current = cliente?.tipo_cliente || null;
+    if (value === current) return;
+    try {
+      setSavingTipo(true);
+      // Si es particular, no tiene equipo; limpiamos y sincronizamos estado local
+      const updates = value === "particular" ? { tipo_cliente: value, equipo: [] } : { tipo_cliente: value };
+      const { data } = await clientesApi.update(id, updates);
+      setCliente(data);
+      if (value === "particular") setEquipoLocal([]);
+    } catch (err) {
+      console.error("Error al guardar tipo:", err);
+      alert(`Error al guardar tipo: ${err.message}`);
+    } finally {
+      setSavingTipo(false);
+    }
+  }
+
+  async function saveDescripcion() {
+    const value = descripcionLocal.trim() || null;
+    if (value === (cliente?.descripcion ?? null)) return;
+    try {
+      setSavingDescripcion(true);
+      const { data } = await clientesApi.update(id, { descripcion: value });
+      setCliente(data);
+    } catch (err) {
+      console.error("Error al guardar descripción:", err);
+      alert(`Error al guardar descripción: ${err.message}`);
+    } finally {
+      setSavingDescripcion(false);
     }
   }
 
@@ -156,9 +196,27 @@ export function ClienteDetail() {
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
+        <div className="flex-1 min-w-0">
           <h2 className="text-3xl font-bold tracking-tight">{cliente.nombre}</h2>
           <p className="text-muted-foreground">Detalles del cliente</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <label htmlFor="tipo_cliente_detail" className="text-sm text-muted-foreground">
+              Tipo:
+            </label>
+            <select
+              id="tipo_cliente_detail"
+              value={tipoCliente}
+              onChange={(e) => setTipoCliente(e.target.value)}
+              onBlur={saveTipoCliente}
+              className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+              disabled={savingTipo}
+            >
+              <option value="">Sin especificar</option>
+              <option value="empresa">Empresa</option>
+              <option value="particular">Particular</option>
+            </select>
+            {savingTipo && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+          </div>
         </div>
       </div>
 
@@ -201,6 +259,34 @@ export function ClienteDetail() {
           </CardContent>
         </Card>
 
+        {cliente.tipo_cliente === "particular" && (
+          <Card className="md:col-span-2">
+            <CardHeader>
+              <CardTitle>Descripción</CardTitle>
+              <CardDescription>
+                Información adicional del cliente particular
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <textarea
+                value={descripcionLocal}
+                onChange={(e) => setDescripcionLocal(e.target.value)}
+                onBlur={saveDescripcion}
+                placeholder="Añade una descripción..."
+                rows={3}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                disabled={savingDescripcion}
+              />
+              {savingDescripcion && (
+                <span className="mt-2 flex items-center gap-1 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Guardando...
+                </span>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {cliente.tipo_cliente !== "particular" && (
         <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -274,6 +360,7 @@ export function ClienteDetail() {
             </div>
           </CardContent>
         </Card>
+        )}
       </div>
     </div>
   );

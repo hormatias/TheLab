@@ -16,6 +16,8 @@ export function ClientesList() {
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [nombreCliente, setNombreCliente] = useState("");
+  const [tipoCliente, setTipoCliente] = useState("");
+  const [descripcionCliente, setDescripcionCliente] = useState("");
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -51,12 +53,19 @@ export function ClientesList() {
 
     try {
       setCreating(true);
-      const { data } = await clientesApi.create({ nombre: nombreCliente.trim() });
+      const payload = {
+        nombre: nombreCliente.trim(),
+        ...(tipoCliente && { tipo_cliente: tipoCliente }),
+        ...(tipoCliente === "particular" && descripcionCliente.trim() && { descripcion: descripcionCliente.trim() }),
+      };
+      const { data } = await clientesApi.create(payload);
 
       setClientes([...clientes, data].sort((a, b) => 
         (a.nombre || "").localeCompare(b.nombre || "")
       ));
       setNombreCliente("");
+      setTipoCliente("");
+      setDescripcionCliente("");
       setShowForm(false);
     } catch (err) {
       console.error("Error al crear cliente:", err);
@@ -205,6 +214,38 @@ export function ClientesList() {
                   disabled={creating}
                 />
               </div>
+              <div>
+                <label htmlFor="tipo_cliente" className="text-sm font-medium">
+                  Tipo
+                </label>
+                <select
+                  id="tipo_cliente"
+                  value={tipoCliente}
+                  onChange={(e) => setTipoCliente(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  disabled={creating}
+                >
+                  <option value="">Sin especificar</option>
+                  <option value="empresa">Empresa</option>
+                  <option value="particular">Particular</option>
+                </select>
+              </div>
+              {tipoCliente === "particular" && (
+                <div>
+                  <label htmlFor="descripcion" className="text-sm font-medium">
+                    Descripción
+                  </label>
+                  <textarea
+                    id="descripcion"
+                    value={descripcionCliente}
+                    onChange={(e) => setDescripcionCliente(e.target.value)}
+                    placeholder="Opcional"
+                    rows={2}
+                    className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    disabled={creating}
+                  />
+                </div>
+              )}
               <div className="flex gap-2">
                 <Button 
                   type="submit" 
@@ -233,6 +274,8 @@ export function ClientesList() {
                   onClick={() => {
                     setShowForm(false);
                     setNombreCliente("");
+                    setTipoCliente("");
+                    setDescripcionCliente("");
                   }}
                   disabled={creating}
                 >
@@ -268,9 +311,28 @@ export function ClientesList() {
             >
               <CardHeader>
                 <div className="flex items-start justify-between gap-2">
-                  <CardTitle className="line-clamp-1 flex-1 pr-2">
-                    {cliente.nombre || cliente.name || cliente.title || "Sin nombre"}
-                  </CardTitle>
+                  <div className="flex-1 min-w-0 pr-2">
+                    <CardTitle className="line-clamp-1">
+                      {cliente.nombre || cliente.name || cliente.title || "Sin nombre"}
+                    </CardTitle>
+                    {cliente.tipo_cliente && (
+                      <span
+                        className={cn(
+                          "inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full",
+                          cliente.tipo_cliente === "empresa"
+                            ? "bg-primary/10 text-primary"
+                            : "bg-muted text-muted-foreground"
+                        )}
+                      >
+                        {cliente.tipo_cliente === "empresa" ? "Empresa" : "Particular"}
+                      </span>
+                    )}
+                    {cliente.tipo_cliente === "particular" && cliente.descripcion && (
+                      <p className="mt-1.5 text-sm text-muted-foreground line-clamp-2">
+                        {cliente.descripcion}
+                      </p>
+                    )}
+                  </div>
                   <Button
                     type="button"
                     variant="ghost"
