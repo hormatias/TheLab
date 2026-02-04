@@ -490,7 +490,7 @@ export function ProyectosList() {
                       </CardTitle>
                       {proyecto.clientes && (
                         <CardDescription className="mt-0">
-                          Cliente: {proyecto.clientes.nombre}
+                          {proyecto.clientes.nombre}
                         </CardDescription>
                       )}
                     </div>
