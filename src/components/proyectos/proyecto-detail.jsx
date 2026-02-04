@@ -1020,91 +1020,6 @@ Responde SOLO con el JSON array, sin explicaciones adicionales.`;
         </Button>
       </div>
 
-      {/* Información del Proyecto */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Información del Proyecto</CardTitle>
-            {!isEditing && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsEditing(true)}
-                title="Editar descripción"
-              >
-                <Edit2 className={cn("h-4 w-4", !isMobile && "mr-2")} />
-                {!isMobile && (proyecto.descripcion ? "Editar descripción" : "Agregar descripción")}
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            {isEditing ? (
-              <div className="space-y-4">
-                <textarea
-                  value={editingDescripcion}
-                  onChange={(e) => setEditingDescripcion(e.target.value)}
-                  placeholder="Escribe una descripción en formato Markdown..."
-                  rows={10}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-y font-mono"
-                  disabled={saving}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Puedes usar Markdown para formatear el texto
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={updateDescripcion}
-                    disabled={saving}
-                    size="sm"
-                  >
-                    {saving ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Guardando...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4 mr-2" />
-                        Guardar
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleCancelEdit}
-                    disabled={saving}
-                    size="sm"
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Cancelar
-                  </Button>
-                </div>
-              </div>
-            ) : proyecto.descripcion ? (
-              <div className="prose prose-sm max-w-none dark:prose-invert">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {proyecto.descripcion}
-                </ReactMarkdown>
-              </div>
-            ) : (
-              <div className="text-center py-6 text-muted-foreground">
-                <p className="mb-3">Este proyecto no tiene descripción</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsEditing(true)}
-                >
-                  <Edit2 className="h-4 w-4 mr-2" />
-                  Agregar descripción
-                </Button>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Presupuesto */}
       <Card>
         <CardHeader>
@@ -1477,6 +1392,93 @@ Responde SOLO con el JSON array, sin explicaciones adicionales.`;
           )}
         </CardContent>
       </Card>
+
+
+      {/* Información del Proyecto */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Información del Proyecto</CardTitle>
+            {!isEditing && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditing(true)}
+                title="Editar descripción"
+              >
+                <Edit2 className={cn("h-4 w-4", !isMobile && "mr-2")} />
+                {!isMobile && (proyecto.descripcion ? "Editar descripción" : "Agregar descripción")}
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            {isEditing ? (
+              <div className="space-y-4">
+                <textarea
+                  value={editingDescripcion}
+                  onChange={(e) => setEditingDescripcion(e.target.value)}
+                  placeholder="Escribe una descripción en formato Markdown..."
+                  rows={10}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-y font-mono"
+                  disabled={saving}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Puedes usar Markdown para formatear el texto
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={updateDescripcion}
+                    disabled={saving}
+                    size="sm"
+                  >
+                    {saving ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Guardando...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        Guardar
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleCancelEdit}
+                    disabled={saving}
+                    size="sm"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            ) : proyecto.descripcion ? (
+              <div className="prose prose-sm max-w-none dark:prose-invert">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {proyecto.descripcion}
+                </ReactMarkdown>
+              </div>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                <p className="mb-3">Este proyecto no tiene descripción</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsEditing(true)}
+                >
+                  <Edit2 className="h-4 w-4 mr-2" />
+                  Agregar descripción
+                </Button>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
 
       {/* Cliente y Miembros */}
       <div className="grid gap-4 md:grid-cols-2">
