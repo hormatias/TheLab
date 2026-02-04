@@ -4,8 +4,9 @@ import { useEntities } from "@/hooks/use-entities";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FolderOpen, Users, User, Loader2, AlertCircle, ChevronRight } from "lucide-react";
+import { formatPresupuestoKpi } from "@/lib/utils";
 
-export function VistaGeneral() {
+export function ProyectosOverview() {
   const navigate = useNavigate();
   const [proyectos, setProyectos] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -54,7 +55,7 @@ export function VistaGeneral() {
       );
       setProyectos(proyectosConClientes);
     } catch (err) {
-      console.error("Error al cargar vista general:", err);
+      console.error("Error al cargar proyectos:", err);
       setError(
         err?.message?.includes("entities")
           ? "No se encontró la tabla 'entities'. Ejecuta la migración 013."
@@ -70,7 +71,7 @@ export function VistaGeneral() {
       <Card>
         <CardContent className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <span className="ml-2 text-muted-foreground">Cargando vista general...</span>
+          <span className="ml-2 text-muted-foreground">Cargando proyectos...</span>
         </CardContent>
       </Card>
     );
@@ -123,24 +124,42 @@ export function VistaGeneral() {
           </Card>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {proyectos.map((proyecto) => (
-              <Card
-                key={proyecto.id}
-                className="hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => navigate(`/proyectos/${proyecto.id}`)}
-              >
-                <CardHeader>
-                  <CardTitle className="line-clamp-1 text-base">
-                    {proyecto.nombre || proyecto.name || proyecto.title || "Sin nombre"}
-                  </CardTitle>
-                  {proyecto.clientes && (
-                    <CardDescription className="mt-1">
-                      Cliente: {proyecto.clientes.nombre}
-                    </CardDescription>
-                  )}
-                </CardHeader>
-              </Card>
-            ))}
+            {proyectos.map((proyecto) => {
+              const kpi = formatPresupuestoKpi(proyecto)
+              return (
+                <Card
+                  key={proyecto.id}
+                  className="hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => navigate(`/proyectos/${proyecto.id}`)}
+                >
+                  <CardHeader className="flex flex-col gap-3">
+                    <div className="space-y-0.5 text-left">
+                      <CardTitle className="line-clamp-1 text-base font-semibold">
+                        {proyecto.nombre || proyecto.name || proyecto.title || "Sin nombre"}
+                      </CardTitle>
+                      {proyecto.clientes && (
+                        <CardDescription className="mt-0">
+                          Cliente: {proyecto.clientes.nombre}
+                        </CardDescription>
+                      )}
+                    </div>
+                    {kpi ? (
+                      <div className="flex items-baseline justify-end gap-1.5 leading-none">
+                        <span className="text-2xl font-bold tabular-nums tracking-tight">
+                          {kpi.main}
+                        </span>
+                        <span className="text-sm text-muted-foreground">{kpi.sub}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-baseline justify-end gap-1.5 leading-none">
+                        <span className="text-2xl font-bold text-muted-foreground/70">—</span>
+                        <span className="text-sm text-muted-foreground">Sin presupuesto</span>
+                      </div>
+                    )}
+                  </CardHeader>
+                </Card>
+              )
+            })}
           </div>
         )}
       </section>

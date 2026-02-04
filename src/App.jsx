@@ -13,7 +13,7 @@ import { FormularioDetail } from "@/components/formularios/formulario-detail";
 import { MensajesList } from "@/components/mensajes/mensajes-list";
 import { Conversacion } from "@/components/mensajes/conversacion";
 import { NuevoMensaje } from "@/components/mensajes/nuevo-mensaje";
-import { VistaGeneral } from "@/components/vista-general/vista-general";
+import { ProyectosOverview } from "@/components/proyectos/proyectos-overview";
 
 function App() {
   return (
@@ -24,7 +24,7 @@ function App() {
           <Route path="/vista-general" element={<Navigate to="/proyectos" replace />} />
           <Route path="/proyectos/lista" element={<ProyectosList />} />
           <Route path="/proyectos/:id" element={<ProyectoDetail />} />
-          <Route path="/proyectos" element={<VistaGeneral />} />
+          <Route path="/proyectos" element={<ProyectosOverview />} />
           <Route path="/clientes" element={<ClientesList />} />
           <Route path="/clientes/:id" element={<ClienteDetail />} />
           <Route path="/miembros" element={<MiembrosList />} />

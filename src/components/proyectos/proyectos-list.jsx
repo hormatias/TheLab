@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { FolderOpen, Loader2, AlertCircle, Plus, Trash2, RefreshCw } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useVerticalViewport } from "@/hooks/use-vertical-viewport";
-import { cn } from "@/lib/utils";
+import { cn, formatPresupuestoKpi } from "@/lib/utils";
 
 export function ProyectosList() {
   const navigate = useNavigate();
@@ -474,47 +474,63 @@ export function ProyectosList() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {proyectos.map((proyecto) => (
-            <Card 
-              key={proyecto.id} 
-              className="hover:shadow-md transition-shadow cursor-pointer"
-              onClick={() => navigate(`/proyectos/${proyecto.id}`)}
-            >
-              <CardHeader>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 pr-2">
-                    <CardTitle className="line-clamp-1">
-                      {proyecto.nombre || proyecto.name || proyecto.title || "Sin nombre"}
-                    </CardTitle>
-                    {proyecto.clientes && (
-                      <CardDescription className="mt-1">
-                        Cliente: {proyecto.clientes.nombre}
-                      </CardDescription>
-                    )}
+          {proyectos.map((proyecto) => {
+            const kpi = formatPresupuestoKpi(proyecto)
+            return (
+              <Card 
+                key={proyecto.id} 
+                className="hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => navigate(`/proyectos/${proyecto.id}`)}
+              >
+                <CardHeader className="flex flex-col gap-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-0.5 min-w-0 flex-1 text-left">
+                      <CardTitle className="line-clamp-1 text-base font-semibold">
+                        {proyecto.nombre || proyecto.name || proyecto.title || "Sin nombre"}
+                      </CardTitle>
+                      {proyecto.clientes && (
+                        <CardDescription className="mt-0">
+                          Cliente: {proyecto.clientes.nombre}
+                        </CardDescription>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive shrink-0"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleDeleteClick(proyecto.id, proyecto.nombre);
+                      }}
+                      disabled={deleting === proyecto.id}
+                      aria-label="Eliminar proyecto"
+                    >
+                      {deleting === proyecto.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive hover:text-destructive shrink-0"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleDeleteClick(proyecto.id, proyecto.nombre);
-                    }}
-                    disabled={deleting === proyecto.id}
-                    aria-label="Eliminar proyecto"
-                  >
-                    {deleting === proyecto.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </CardHeader>
-            </Card>
-          ))}
+                  {kpi ? (
+                    <div className="flex items-baseline justify-end gap-1.5 leading-none">
+                      <span className="text-2xl font-bold tabular-nums tracking-tight">
+                        {kpi.main}
+                      </span>
+                      <span className="text-sm text-muted-foreground">{kpi.sub}</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-baseline justify-end gap-1.5 leading-none">
+                      <span className="text-2xl font-bold text-muted-foreground/70">—</span>
+                      <span className="text-sm text-muted-foreground">Sin presupuesto</span>
+                    </div>
+                  )}
+                </CardHeader>
+              </Card>
+            )
+          })}
         </div>
       )}
 
