@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { useEntities } from "@/hooks/use-entities";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FolderOpen, Loader2, AlertCircle, Plus, Trash2, RefreshCw } from "lucide-react";
@@ -19,10 +19,18 @@ export function ProyectosList() {
   const [nombreProyecto, setNombreProyecto] = useState("");
   const [descripcionProyecto, setDescripcionProyecto] = useState("");
   const [clienteId, setClienteId] = useState("");
+  const [presupuestoProyecto, setPresupuestoProyecto] = useState("");
+  const [monedaProyecto, setMonedaProyecto] = useState("EUR");
+  const [tipoPresupuestoProyecto, setTipoPresupuestoProyecto] = useState("unico");
+  const [frecuenciaRecurrenciaProyecto, setFrecuenciaRecurrenciaProyecto] = useState("mensual");
+  const [numeroCuotasProyecto, setNumeroCuotasProyecto] = useState("");
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState(null);
-  const [tableName, setTableName] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
+
+  // Hooks para entidades
+  const proyectosApi = useEntities("proyecto");
+  const clientesApi = useEntities("cliente");
 
   useEffect(() => {
     loadProyectos();
@@ -31,16 +39,7 @@ export function ProyectosList() {
 
   async function loadClientes() {
     try {
-      const { data, error } = await supabase
-        .from("clientes")
-        .select("id, nombre")
-        .order("nombre", { ascending: true });
-
-      if (error) {
-        console.error("Error al cargar clientes:", error);
-        return;
-      }
-
+      const { data } = await clientesApi.list({ orderBy: "nombre", ascending: true });
       setClientes(data || []);
     } catch (err) {
       console.error("Error al cargar clientes:", err);
@@ -52,33 +51,36 @@ export function ProyectosList() {
       setLoading(true);
       setError(null);
 
-      const table = "proyectos";
-      setTableName(table);
+      const { data } = await proyectosApi.list({ orderBy: "nombre", ascending: true });
 
-      const { data, error } = await supabase
-        .from(table)
-        .select(`
-          *,
-          clientes (
-            id,
-            nombre
-          )
-        `)
-        .order("nombre", { ascending: true });
+      // Cargar info de clientes para los proyectos que tienen cliente_id
+      const proyectosConClientes = await Promise.all(
+        (data || []).map(async (proyecto) => {
+          if (proyecto.cliente_id) {
+            const clienteData = clientes.find(c => c.id === proyecto.cliente_id);
+            if (clienteData) {
+              return { ...proyecto, clientes: clienteData };
+            }
+            // Si no está en cache, cargarlo
+            try {
+              const { data: cliente } = await clientesApi.get(proyecto.cliente_id);
+              return { ...proyecto, clientes: cliente };
+            } catch {
+              return proyecto;
+            }
+          }
+          return proyecto;
+        })
+      );
 
-      if (error) {
-        if (error.code === "PGRST116") {
-          throw new Error(
-            `No se encontró la tabla "proyectos". Por favor, crea la tabla en tu base de datos de Supabase.`
-          );
-        }
-        throw error;
-      }
-
-      setProyectos(data || []);
+      setProyectos(proyectosConClientes);
     } catch (err) {
       console.error("Error al cargar proyectos:", err);
-      setError(err.message);
+      if (err.code === "PGRST116" || err.message?.includes("entities")) {
+        setError("No se encontró la tabla 'entities'. Por favor, ejecuta la migración 013_create_entities_table.sql");
+      } else {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -86,36 +88,47 @@ export function ProyectosList() {
 
   async function createProyecto(e) {
     e.preventDefault();
-    if (!nombreProyecto.trim() || !tableName) return;
+    if (!nombreProyecto.trim()) return;
 
     try {
       setCreating(true);
       const proyectoData = {
         nombre: nombreProyecto.trim(),
         ...(clienteId && { cliente_id: clienteId }),
-        ...(descripcionProyecto.trim() && { descripcion: descripcionProyecto.trim() })
+        ...(descripcionProyecto.trim() && { descripcion: descripcionProyecto.trim() }),
+        ...(presupuestoProyecto.trim() && { presupuesto: parseFloat(presupuestoProyecto.trim()) }),
+        moneda: monedaProyecto || "EUR",
+        tipo_presupuesto: tipoPresupuestoProyecto || "unico",
+        tareas: [],
+        miembro_ids: [],
+        ...((tipoPresupuestoProyecto === "recurrente" || tipoPresupuestoProyecto === "fraccionado") && {
+          frecuencia_recurrencia: frecuenciaRecurrenciaProyecto || null,
+          numero_cuotas: numeroCuotasProyecto.trim() ? parseInt(numeroCuotasProyecto.trim()) : null
+        })
       };
 
-      const { data, error } = await supabase
-        .from(tableName)
-        .insert([proyectoData])
-        .select(`
-          *,
-          clientes (
-            id,
-            nombre
-          )
-        `)
-        .single();
+      const { data } = await proyectosApi.create(proyectoData);
 
-      if (error) throw error;
+      // Agregar info de cliente si existe
+      let proyectoConCliente = data;
+      if (clienteId) {
+        const cliente = clientes.find(c => c.id === clienteId);
+        if (cliente) {
+          proyectoConCliente = { ...data, clientes: cliente };
+        }
+      }
 
-      setProyectos([...proyectos, data].sort((a, b) => 
+      setProyectos([...proyectos, proyectoConCliente].sort((a, b) => 
         (a.nombre || "").localeCompare(b.nombre || "")
       ));
       setNombreProyecto("");
       setDescripcionProyecto("");
       setClienteId("");
+      setPresupuestoProyecto("");
+      setMonedaProyecto("EUR");
+      setTipoPresupuestoProyecto("unico");
+      setFrecuenciaRecurrenciaProyecto("mensual");
+      setNumeroCuotasProyecto("");
       setShowForm(false);
     } catch (err) {
       console.error("Error al crear proyecto:", err);
@@ -130,7 +143,7 @@ export function ProyectosList() {
   };
 
   const confirmDeleteProyecto = async () => {
-    if (!confirmDelete || !tableName) {
+    if (!confirmDelete) {
       setConfirmDelete(null);
       return;
     }
@@ -141,12 +154,7 @@ export function ProyectosList() {
       setDeleting(id);
       setConfirmDelete(null);
       
-      const { error } = await supabase
-        .from(tableName)
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
+      await proyectosApi.remove(id);
 
       setProyectos(proyectos.filter((p) => p.id !== id));
     } catch (err) {
@@ -169,9 +177,10 @@ export function ProyectosList() {
   }
 
   if (error) {
-    const isTableNotFound = error.includes("No se encontró ninguna tabla") || 
+    const isTableNotFound = error.includes("No se encontró") || 
                            error.includes("schema cache") ||
-                           error.includes("PGRST116");
+                           error.includes("PGRST116") ||
+                           error.includes("entities");
     
     // Si la tabla no existe, mostrar mensaje
     if (isTableNotFound) {
@@ -184,7 +193,7 @@ export function ProyectosList() {
                 <p className="font-medium">Tabla no encontrada</p>
                 <p className="text-sm text-muted-foreground mt-2">{error}</p>
                 <p className="text-sm text-muted-foreground mt-4">
-                  Crea la tabla "proyectos" en tu base de datos de Supabase con los campos: id (UUID) y nombre (TEXT).
+                  Ejecuta la migración para crear la tabla "entities" en tu base de datos de Supabase.
                 </p>
                 <Button onClick={loadProyectos} className="mt-4" variant="outline">
                   Reintentar
@@ -307,6 +316,101 @@ export function ProyectosList() {
                   ))}
                 </select>
               </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label htmlFor="presupuesto" className="text-sm font-medium">
+                    Presupuesto (opcional)
+                  </label>
+                  <input
+                    id="presupuesto"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={presupuestoProyecto}
+                    onChange={(e) => setPresupuestoProyecto(e.target.value)}
+                    placeholder="0.00"
+                    className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    disabled={creating}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="moneda" className="text-sm font-medium">
+                    Moneda
+                  </label>
+                  <select
+                    id="moneda"
+                    value={monedaProyecto}
+                    onChange={(e) => setMonedaProyecto(e.target.value)}
+                    className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    disabled={creating}
+                  >
+                    <option value="EUR">EUR - Euro</option>
+                    <option value="USD">USD - Dólar estadounidense</option>
+                    <option value="ARS">ARS - Peso argentino</option>
+                    <option value="MXN">MXN - Peso mexicano</option>
+                    <option value="CLP">CLP - Peso chileno</option>
+                    <option value="COP">COP - Peso colombiano</option>
+                    <option value="BRL">BRL - Real brasileño</option>
+                    <option value="GBP">GBP - Libra esterlina</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label htmlFor="tipo_presupuesto" className="text-sm font-medium">
+                  Tipo de Presupuesto
+                </label>
+                <select
+                  id="tipo_presupuesto"
+                  value={tipoPresupuestoProyecto}
+                  onChange={(e) => setTipoPresupuestoProyecto(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  disabled={creating}
+                >
+                  <option value="unico">Único (pago único)</option>
+                  <option value="recurrente">Recurrente (pagos periódicos)</option>
+                  <option value="fraccionado">Fraccionado (pago total en cuotas)</option>
+                </select>
+              </div>
+              {(tipoPresupuestoProyecto === "recurrente" || tipoPresupuestoProyecto === "fraccionado") && (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label htmlFor="frecuencia" className="text-sm font-medium">
+                      Frecuencia
+                    </label>
+                    <select
+                      id="frecuencia"
+                      value={frecuenciaRecurrenciaProyecto}
+                      onChange={(e) => setFrecuenciaRecurrenciaProyecto(e.target.value)}
+                      className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      disabled={creating}
+                    >
+                      <option value="mensual">Mensual</option>
+                      <option value="anual">Anual</option>
+                      <option value="personalizado">Personalizado</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="cuotas" className="text-sm font-medium">
+                      Número de Cuotas
+                    </label>
+                    <input
+                      id="cuotas"
+                      type="number"
+                      min="1"
+                      value={numeroCuotasProyecto}
+                      onChange={(e) => setNumeroCuotasProyecto(e.target.value)}
+                      placeholder="Ej: 12"
+                      className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      disabled={creating}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {tipoPresupuestoProyecto === "recurrente" 
+                        ? "Ej: 12 cuotas = 12 períodos."
+                        : "Ej: 12 cuotas = dividir el presupuesto total en 12 pagos iguales"}
+                    </p>
+                  </div>
+                </div>
+              )}
               <div className="flex gap-2">
                 <Button 
                   type="submit" 
@@ -337,6 +441,11 @@ export function ProyectosList() {
                     setNombreProyecto("");
                     setDescripcionProyecto("");
                     setClienteId("");
+                    setPresupuestoProyecto("");
+                    setMonedaProyecto("EUR");
+                    setTipoPresupuestoProyecto("unico");
+                    setFrecuenciaRecurrenciaProyecto("mensual");
+                    setNumeroCuotasProyecto("");
                   }}
                   disabled={creating}
                 >
