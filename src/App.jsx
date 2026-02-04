@@ -14,6 +14,7 @@ import { MensajesList } from "@/components/mensajes/mensajes-list";
 import { Conversacion } from "@/components/mensajes/conversacion";
 import { NuevoMensaje } from "@/components/mensajes/nuevo-mensaje";
 import { ProyectosOverview } from "@/components/proyectos/proyectos-overview";
+import { ProyectoNuevo } from "@/components/proyectos/proyecto-nuevo";
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
           <Route path="/" element={<Navigate to="/proyectos" replace />} />
           <Route path="/vista-general" element={<Navigate to="/proyectos" replace />} />
           <Route path="/proyectos/lista" element={<ProyectosList />} />
+          <Route path="/proyectos/nuevo" element={<ProyectoNuevo />} />
           <Route path="/proyectos/:id" element={<ProyectoDetail />} />
           <Route path="/proyectos" element={<ProyectosOverview />} />
           <Route path="/clientes" element={<ClientesList />} />

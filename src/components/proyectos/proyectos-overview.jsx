@@ -2,8 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useEntities } from "@/hooks/use-entities";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { FolderOpen, Users, User, Loader2, AlertCircle, ChevronRight } from "lucide-react";
+import { FolderOpen, Users, User, Loader2, AlertCircle, ChevronRight, Plus } from "lucide-react";
 import { formatPresupuestoKpi } from "@/lib/utils";
 
 export function ProyectosOverview() {
@@ -95,14 +94,10 @@ export function ProyectosOverview() {
     <div className="space-y-8">
       {/* Sección Proyectos */}
       <section className="space-y-3">
-        <div className="flex items-center justify-end">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/proyectos/lista" className="flex items-center gap-1">
-              Ver todos
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <FolderOpen className="h-5 w-5" />
+          Proyectos
+        </h3>
         {proyectos.length === 0 ? (
           <Card>
             <CardContent className="py-8">
@@ -114,8 +109,8 @@ export function ProyectosOverview() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {proyectos.map((proyecto) => {
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {proyectos.slice(0, 3).map((proyecto) => {
               const kpi = formatPresupuestoKpi(proyecto)
               return (
                 <Card
@@ -151,24 +146,40 @@ export function ProyectosOverview() {
                 </Card>
               )
             })}
+            <div className="flex flex-col gap-4 h-full min-h-0">
+              {proyectos.length > 3 && (
+                <Link to="/proyectos/lista" className="flex flex-1 min-h-0 w-full min-w-0">
+                  <Card className="w-full h-full hover:shadow-md transition-shadow cursor-pointer border-dashed flex flex-col">
+                    <CardHeader className="flex-1 flex flex-col items-center justify-center py-4">
+                      <div className="flex flex-row items-center justify-center gap-2 w-full text-center">
+                        <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
+                        <CardTitle className="text-sm font-semibold text-muted-foreground text-center">Ver más</CardTitle>
+                      </div>
+                    </CardHeader>
+                  </Card>
+                </Link>
+              )}
+              <Link to="/proyectos/nuevo" className="flex flex-1 min-h-0 w-full min-w-0">
+                <Card className="w-full h-full hover:shadow-md transition-shadow cursor-pointer border-dashed flex flex-col">
+                  <CardHeader className="flex-1 flex flex-col items-center justify-center py-4">
+                    <div className="flex flex-row items-center justify-center gap-2 w-full text-center">
+                      <Plus className="h-5 w-5 text-muted-foreground shrink-0" />
+                      <CardTitle className="text-sm font-semibold text-muted-foreground text-center">Agregar nuevo</CardTitle>
+                    </div>
+                  </CardHeader>
+                </Card>
+              </Link>
+            </div>
           </div>
         )}
       </section>
 
       {/* Sección Clientes */}
       <section className="space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Clientes
-          </h3>
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/clientes" className="flex items-center gap-1">
-              Ver todos
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <Users className="h-5 w-5" />
+          Clientes
+        </h3>
         {clientes.length === 0 ? (
           <Card>
             <CardContent className="py-8">
@@ -180,8 +191,8 @@ export function ProyectosOverview() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {clientes.map((cliente) => (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {clientes.slice(0, 3).map((cliente) => (
               <Card
                 key={cliente.id}
                 className="hover:shadow-md transition-shadow cursor-pointer"
@@ -194,24 +205,40 @@ export function ProyectosOverview() {
                 </CardHeader>
               </Card>
             ))}
+            <div className="flex flex-col gap-4 h-full min-h-0">
+              {clientes.length > 3 && (
+                <Link to="/clientes" className="flex flex-1 min-h-0 w-full min-w-0">
+                  <Card className="w-full h-full hover:shadow-md transition-shadow cursor-pointer border-dashed flex flex-col">
+                    <CardHeader className="flex-1 flex flex-col items-center justify-center py-4">
+                      <div className="flex flex-row items-center justify-center gap-2 w-full text-center">
+                        <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
+                        <CardTitle className="text-sm font-semibold text-muted-foreground text-center">Ver más</CardTitle>
+                      </div>
+                    </CardHeader>
+                  </Card>
+                </Link>
+              )}
+              <Link to="/clientes" className="flex flex-1 min-h-0 w-full min-w-0">
+                <Card className="w-full h-full hover:shadow-md transition-shadow cursor-pointer border-dashed flex flex-col">
+                  <CardHeader className="flex-1 flex flex-col items-center justify-center py-4">
+                    <div className="flex flex-row items-center justify-center gap-2 w-full text-center">
+                      <Plus className="h-5 w-5 text-muted-foreground shrink-0" />
+                      <CardTitle className="text-sm font-semibold text-muted-foreground text-center">Agregar nuevo</CardTitle>
+                    </div>
+                  </CardHeader>
+                </Card>
+              </Link>
+            </div>
           </div>
         )}
       </section>
 
       {/* Sección Miembros */}
       <section className="space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <User className="h-5 w-5" />
-            Miembros
-          </h3>
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/miembros" className="flex items-center gap-1">
-              Ver todos
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <User className="h-5 w-5" />
+          Miembros
+        </h3>
         {miembros.length === 0 ? (
           <Card>
             <CardContent className="py-8">
@@ -223,8 +250,8 @@ export function ProyectosOverview() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {miembros.map((miembro) => (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {miembros.slice(0, 3).map((miembro) => (
               <Card
                 key={miembro.id}
                 className="hover:shadow-md transition-shadow cursor-pointer"
@@ -240,6 +267,30 @@ export function ProyectosOverview() {
                 </CardHeader>
               </Card>
             ))}
+            <div className="flex flex-col gap-4 h-full min-h-0">
+              {miembros.length > 3 && (
+                <Link to="/miembros" className="flex flex-1 min-h-0 w-full min-w-0">
+                  <Card className="w-full h-full hover:shadow-md transition-shadow cursor-pointer border-dashed flex flex-col">
+                    <CardHeader className="flex-1 flex flex-col items-center justify-center py-4">
+                      <div className="flex flex-row items-center justify-center gap-2 w-full text-center">
+                        <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
+                        <CardTitle className="text-sm font-semibold text-muted-foreground text-center">Ver más</CardTitle>
+                      </div>
+                    </CardHeader>
+                  </Card>
+                </Link>
+              )}
+              <Link to="/miembros" className="flex flex-1 min-h-0 w-full min-w-0">
+                <Card className="w-full h-full hover:shadow-md transition-shadow cursor-pointer border-dashed flex flex-col">
+                  <CardHeader className="flex-1 flex flex-col items-center justify-center py-4">
+                    <div className="flex flex-row items-center justify-center gap-2 w-full text-center">
+                      <Plus className="h-5 w-5 text-muted-foreground shrink-0" />
+                      <CardTitle className="text-sm font-semibold text-muted-foreground text-center">Agregar nuevo</CardTitle>
+                    </div>
+                  </CardHeader>
+                </Card>
+              </Link>
+            </div>
           </div>
         )}
       </section>
