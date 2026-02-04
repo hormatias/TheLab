@@ -4,9 +4,11 @@ import { useEntities } from "@/hooks/use-entities";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, AlertCircle, ArrowLeft, FolderOpen, Eye } from "lucide-react";
+import { Loader2, AlertCircle, ArrowLeft, FolderOpen, Eye, Users, Plus, Trash2 } from "lucide-react";
 import { useVerticalViewport } from "@/hooks/use-vertical-viewport";
 import { cn } from "@/lib/utils";
+
+const EMPTY_MIEMBRO = { nombre: "", rol: "", descripcion: "" };
 
 export function ClienteDetail() {
   const { id } = useParams();
@@ -14,6 +16,8 @@ export function ClienteDetail() {
   const { isMobile } = useVerticalViewport();
   const [cliente, setCliente] = useState(null);
   const [proyectos, setProyectos] = useState([]);
+  const [equipoLocal, setEquipoLocal] = useState([]);
+  const [savingEquipo, setSavingEquipo] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -23,6 +27,20 @@ export function ClienteDetail() {
     loadCliente();
     loadProyectos();
   }, [id]);
+
+  // Sincronizar equipo local cuando cambia el cliente cargado (rango → rol por compatibilidad)
+  useEffect(() => {
+    if (cliente) {
+      const equipo = Array.isArray(cliente.equipo) ? cliente.equipo : [];
+      setEquipoLocal(
+        equipo.map((m) => ({
+          ...EMPTY_MIEMBRO,
+          ...m,
+          rol: m.rol ?? m.rango ?? "",
+        }))
+      );
+    }
+  }, [cliente?.id, cliente?.equipo]);
 
   async function loadCliente() {
     try {
@@ -41,6 +59,35 @@ export function ClienteDetail() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  function updateEquipoItem(index, field, value) {
+    setEquipoLocal((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  }
+
+  function removeEquipoItem(index) {
+    setEquipoLocal((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function addEquipoItem() {
+    setEquipoLocal((prev) => [...prev, { ...EMPTY_MIEMBRO }]);
+  }
+
+  async function saveEquipo() {
+    try {
+      setSavingEquipo(true);
+      const { data } = await clientesApi.update(id, { equipo: equipoLocal });
+      setCliente(data);
+    } catch (err) {
+      console.error("Error al guardar equipo:", err);
+      alert(`Error al guardar equipo: ${err.message}`);
+    } finally {
+      setSavingEquipo(false);
     }
   }
 
@@ -116,25 +163,7 @@ export function ClienteDetail() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Información del Cliente</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Nombre</p>
-              <p className="text-lg">{cliente.nombre}</p>
-            </div>
-            {cliente.id && (
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">ID</p>
-                <p className="text-sm font-mono">{cliente.id}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
+        <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FolderOpen className="h-5 w-5" />
@@ -169,6 +198,80 @@ export function ClienteDetail() {
                 ))}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Equipo del cliente
+            </CardTitle>
+            <CardDescription>
+              Personas de contacto: nombre, rol y descripción
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              {equipoLocal.map((miembro, index) => (
+                <div
+                  key={index}
+                  className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-start sm:gap-4"
+                >
+                  <div className="grid flex-1 gap-2 sm:grid-cols-3">
+                    <input
+                      type="text"
+                      placeholder="Nombre"
+                      value={miembro.nombre}
+                      onChange={(e) => updateEquipoItem(index, "nombre", e.target.value)}
+                      className="rounded-md border bg-background px-3 py-2 text-sm"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Rol"
+                      value={miembro.rol}
+                      onChange={(e) => updateEquipoItem(index, "rol", e.target.value)}
+                      className="rounded-md border bg-background px-3 py-2 text-sm"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Descripción"
+                      value={miembro.descripcion}
+                      onChange={(e) => updateEquipoItem(index, "descripcion", e.target.value)}
+                      className="rounded-md border bg-background px-3 py-2 text-sm sm:col-span-1"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeEquipoItem(index)}
+                    aria-label="Quitar del equipo"
+                    className="shrink-0 text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={addEquipoItem}>
+                <Plus className="h-4 w-4 mr-1" />
+                Añadir persona
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={saveEquipo}
+                disabled={savingEquipo}
+              >
+                {savingEquipo ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Guardar equipo"
+                )}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
