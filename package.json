@@ -8,12 +8,11 @@
     "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "tauri:dev": "concurrently \"npm run dev\" \"tauri dev\"",
+    "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "db:link": "supabase link",
     "db:push": "supabase db push",
-    "db:migrate": "supabase db push",
-    "db:status": "supabase status"
+    "db:migrate": "supabase db push"
   },
   "dependencies": {
     "@radix-ui/react-collapsible": "^1.1.12",
@@ -25,6 +24,8 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.562.0",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^5.4.530",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-markdown": "^9.0.1",
