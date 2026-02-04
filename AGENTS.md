@@ -2,7 +2,7 @@
 
 ## Qué son las entities
 
-Todo el dominio (proyectos, clientes, miembros, formularios, cámaras) vive en **una sola tabla** `entities` en Supabase. Cada fila tiene:
+Todo el dominio (proyectos, clientes, miembros, formularios, cámaras) vive en **una sola tabla** `entities`. Cada fila tiene:
 
 - **id** (UUID)
 - **type** – tipo de entidad (string)
