@@ -264,9 +264,9 @@ export function Camaras() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight">Cámaras de Tráfico</h2>
+        <h2 className="text-3xl font-bold tracking-tight">Cámaras de Andorra</h2>
         <p className="text-muted-foreground">
-          Visualización en tiempo real de las cámaras de tráfico de Andorra
+          Visualización en tiempo real de las cámaras de Andorra
         </p>
       </div>
 

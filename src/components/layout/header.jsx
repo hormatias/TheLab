@@ -21,7 +21,7 @@ const getPageTitle = (pathname) => {
     return "Contabilidad";
   }
   if (pathname.startsWith("/camaras")) {
-    return "Cámaras";
+    return "Cámaras de Andorra";
   }
   return "TheLab";
 };
