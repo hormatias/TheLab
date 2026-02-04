@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { useEntities } from "@/hooks/use-entities";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { User, Loader2, AlertCircle, Plus, Trash2, RefreshCw } from "lucide-react";
@@ -21,6 +21,8 @@ export function MiembrosList() {
   const [deleting, setDeleting] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
 
+  const miembrosApi = useEntities("miembro");
+
   useEffect(() => {
     loadMiembros();
   }, []);
@@ -37,24 +39,11 @@ export function MiembrosList() {
       setLoading(true);
       setError(null);
 
-      const { data, error } = await supabase
-        .from("miembros")
-        .select("*")
-        .order("nombre", { ascending: true });
-
-      if (error) {
-        if (error.code === "PGRST116") {
-          throw new Error(
-            `No se encontró la tabla "miembros". Por favor, crea la tabla en tu base de datos de Supabase.`
-          );
-        }
-        throw error;
-      }
-
+      const { data } = await miembrosApi.list({ orderBy: "nombre", ascending: true });
       setMiembros(data || []);
     } catch (err) {
       console.error("Error al cargar miembros:", err);
-      setError(err.message);
+      setError(err.message || "Error al cargar miembros");
     } finally {
       setLoading(false);
     }
@@ -71,13 +60,7 @@ export function MiembrosList() {
         ...(emailMiembro.trim() && { email: emailMiembro.trim() })
       };
 
-      const { data, error } = await supabase
-        .from("miembros")
-        .insert([miembroData])
-        .select()
-        .single();
-
-      if (error) throw error;
+      const { data } = await miembrosApi.create(miembroData);
 
       setMiembros([...miembros, data].sort((a, b) =>
         (a.nombre || "").localeCompare(b.nombre || "")
@@ -109,12 +92,7 @@ export function MiembrosList() {
       setDeleting(id);
       setConfirmDelete(null);
 
-      const { error } = await supabase
-        .from("miembros")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
+      await miembrosApi.remove(id);
 
       setMiembros(miembros.filter((m) => m.id !== id));
     } catch (err) {
@@ -139,7 +117,8 @@ export function MiembrosList() {
   if (error) {
     const isTableNotFound = error.includes("No se encontró") ||
       error.includes("schema cache") ||
-      error.includes("PGRST116");
+      error.includes("PGRST116") ||
+      error.includes("entities");
 
     if (isTableNotFound) {
       return (
@@ -151,7 +130,7 @@ export function MiembrosList() {
                 <p className="font-medium">Tabla no encontrada</p>
                 <p className="text-sm text-muted-foreground mt-2">{error}</p>
                 <p className="text-sm text-muted-foreground mt-4">
-                  Crea la tabla "miembros" en tu base de datos de Supabase.
+                  Ejecuta la migración para crear la tabla "entities" en tu base de datos de Supabase.
                 </p>
                 <Button onClick={loadMiembros} className="mt-4" variant="outline">
                   Reintentar
@@ -355,7 +334,7 @@ export function MiembrosList() {
         onConfirm={confirmDeleteMiembro}
         onCancel={() => setConfirmDelete(null)}
         title="Eliminar Miembro"
-        message={`¿Estás seguro de que quieres eliminar el miembro "${confirmDelete?.nombre}"? Esta acción no se puede deshacer y también se eliminarán todas sus asignaciones a proyectos.`}
+        message={`¿Estás seguro de que quieres eliminar el miembro "${confirmDelete?.nombre}"? Esta acción no se puede deshacer.`}
       />
     </div>
   );

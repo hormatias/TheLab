@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useEntities } from "@/hooks/use-entities";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,8 @@ export function ClienteDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const clientesApi = useEntities("cliente");
+
   useEffect(() => {
     loadCliente();
     loadProyectos();
@@ -26,17 +29,10 @@ export function ClienteDetail() {
       setLoading(true);
       setError(null);
 
-      const { data, error } = await supabase
-        .from("clientes")
-        .select("*")
-        .eq("id", id)
-        .single();
+      const { data } = await clientesApi.get(id);
 
-      if (error) {
-        if (error.code === "PGRST116") {
-          throw new Error("Cliente no encontrado");
-        }
-        throw error;
+      if (!data) {
+        throw new Error("Cliente no encontrado");
       }
 
       setCliente(data);
@@ -50,14 +46,21 @@ export function ClienteDetail() {
 
   async function loadProyectos() {
     try {
+      // Buscar proyectos que tengan este cliente_id en su data
       const { data, error } = await supabase
-        .from("proyectos")
-        .select("id, nombre")
-        .eq("cliente_id", id)
-        .order("nombre", { ascending: true });
+        .from("entities")
+        .select("id, data")
+        .eq("type", "proyecto")
+        .filter("data->>cliente_id", "eq", id)
+        .order("data->>nombre", { ascending: true });
 
       if (!error) {
-        setProyectos(data || []);
+        // Transformar para extraer nombre de data
+        const proyectosFormateados = (data || []).map(p => ({
+          id: p.id,
+          nombre: p.data?.nombre || "Sin nombre"
+        }));
+        setProyectos(proyectosFormateados);
       }
     } catch (err) {
       console.error("Error al cargar proyectos del cliente:", err);

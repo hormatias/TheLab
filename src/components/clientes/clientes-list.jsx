@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { useEntities } from "@/hooks/use-entities";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FolderOpen, Loader2, AlertCircle, Plus, Trash2, RefreshCw } from "lucide-react";
@@ -20,6 +20,8 @@ export function ClientesList() {
   const [deleting, setDeleting] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
 
+  const clientesApi = useEntities("cliente");
+
   useEffect(() => {
     loadClientes();
   }, []);
@@ -29,24 +31,15 @@ export function ClientesList() {
       setLoading(true);
       setError(null);
 
-      const { data, error } = await supabase
-        .from("clientes")
-        .select("*")
-        .order("nombre", { ascending: true });
-
-      if (error) {
-        if (error.code === "PGRST116") {
-          throw new Error(
-            `No se encontró la tabla "clientes". Por favor, crea la tabla en tu base de datos de Supabase.`
-          );
-        }
-        throw error;
-      }
-
+      const { data } = await clientesApi.list({ orderBy: "nombre", ascending: true });
       setClientes(data || []);
     } catch (err) {
       console.error("Error al cargar clientes:", err);
-      setError(err.message);
+      if (err.code === "PGRST116" || err.message?.includes("entities")) {
+        setError("No se encontró la tabla 'entities'. Por favor, ejecuta la migración 013_create_entities_table.sql");
+      } else {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -58,13 +51,7 @@ export function ClientesList() {
 
     try {
       setCreating(true);
-      const { data, error } = await supabase
-        .from("clientes")
-        .insert([{ nombre: nombreCliente.trim() }])
-        .select()
-        .single();
-
-      if (error) throw error;
+      const { data } = await clientesApi.create({ nombre: nombreCliente.trim() });
 
       setClientes([...clientes, data].sort((a, b) => 
         (a.nombre || "").localeCompare(b.nombre || "")
@@ -95,12 +82,7 @@ export function ClientesList() {
       setDeleting(id);
       setConfirmDelete(null);
       
-      const { error } = await supabase
-        .from("clientes")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
+      await clientesApi.remove(id);
 
       setClientes(clientes.filter((c) => c.id !== id));
     } catch (err) {
@@ -125,7 +107,8 @@ export function ClientesList() {
   if (error) {
     const isTableNotFound = error.includes("No se encontró") || 
                            error.includes("schema cache") ||
-                           error.includes("PGRST116");
+                           error.includes("PGRST116") ||
+                           error.includes("entities");
     
     if (isTableNotFound) {
       return (
@@ -137,7 +120,7 @@ export function ClientesList() {
                 <p className="font-medium">Tabla no encontrada</p>
                 <p className="text-sm text-muted-foreground mt-2">{error}</p>
                 <p className="text-sm text-muted-foreground mt-4">
-                  Crea la tabla "clientes" en tu base de datos de Supabase con los campos: id (UUID) y nombre (TEXT).
+                  Ejecuta la migración para crear la tabla "entities" en tu base de datos de Supabase.
                 </p>
                 <Button onClick={loadClientes} className="mt-4" variant="outline">
                   Reintentar
