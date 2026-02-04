@@ -515,11 +515,11 @@ export function ProyectosList() {
                     </Button>
                   </div>
                   {kpi ? (
-                    <div className="flex items-baseline justify-end gap-1.5 leading-none">
+                    <div className="flex items-baseline justify-end gap-1.5 leading-none text-green-600">
                       <span className="text-2xl font-bold tabular-nums tracking-tight">
                         {kpi.main}
                       </span>
-                      <span className="text-sm text-muted-foreground">{kpi.sub}</span>
+                      <span className="text-sm opacity-90">{kpi.sub}</span>
                     </div>
                   ) : (
                     <div className="flex items-baseline justify-end gap-1.5 leading-none">
