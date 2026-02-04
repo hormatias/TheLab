@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { supabase } from "@/lib/supabase";
+import { getEntityById } from "@/hooks/use-entities";
 
 const getPageTitle = (pathname) => {
   if (pathname.startsWith("/proyectos")) {
@@ -13,6 +13,15 @@ const getPageTitle = (pathname) => {
   }
   if (pathname.startsWith("/miembros")) {
     return "Miembros";
+  }
+  if (pathname.startsWith("/formularios")) {
+    return "Formularios";
+  }
+  if (pathname.startsWith("/contabilidad")) {
+    return "Contabilidad";
+  }
+  if (pathname.startsWith("/camaras")) {
+    return "Cámaras";
   }
   return "TheLab";
 };
@@ -27,17 +36,13 @@ export function Header() {
       const clienteMatch = location.pathname.match(/^\/clientes\/([^/]+)$/);
       const proyectoMatch = location.pathname.match(/^\/proyectos\/([^/]+)$/);
       const miembroMatch = location.pathname.match(/^\/miembros\/([^/]+)$/);
+      const formularioMatch = location.pathname.match(/^\/formularios\/([^/]+)$/);
 
       if (clienteMatch) {
         const id = clienteMatch[1];
         try {
-          const { data, error } = await supabase
-            .from("clientes")
-            .select("nombre")
-            .eq("id", id)
-            .single();
-
-          if (!error && data) {
+          const { data } = await getEntityById("cliente", id);
+          if (data) {
             setPageTitle(data.nombre);
           } else {
             setPageTitle("Clientes");
@@ -48,13 +53,8 @@ export function Header() {
       } else if (proyectoMatch) {
         const id = proyectoMatch[1];
         try {
-          const { data, error } = await supabase
-            .from("proyectos")
-            .select("nombre")
-            .eq("id", id)
-            .single();
-
-          if (!error && data) {
+          const { data } = await getEntityById("proyecto", id);
+          if (data) {
             setPageTitle(data.nombre);
           } else {
             setPageTitle("Proyectos");
@@ -65,19 +65,26 @@ export function Header() {
       } else if (miembroMatch) {
         const id = miembroMatch[1];
         try {
-          const { data, error } = await supabase
-            .from("miembros")
-            .select("nombre")
-            .eq("id", id)
-            .single();
-
-          if (!error && data) {
+          const { data } = await getEntityById("miembro", id);
+          if (data) {
             setPageTitle(data.nombre);
           } else {
             setPageTitle("Miembros");
           }
         } catch (err) {
           setPageTitle("Miembros");
+        }
+      } else if (formularioMatch) {
+        const id = formularioMatch[1];
+        try {
+          const { data } = await getEntityById("formulario", id);
+          if (data) {
+            setPageTitle(data.nombre);
+          } else {
+            setPageTitle("Formularios");
+          }
+        } catch (err) {
+          setPageTitle("Formularios");
         }
       } else {
         // Ruta normal, usar el título genérico

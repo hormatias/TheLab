@@ -74,6 +74,23 @@ body {
   color: hsl(var(--foreground));
 }
 
+/* Mobile-first: evitar zoom automático en iOS Safari */
+/* Todos los inputs, textareas y selects deben tener al menos 16px de fuente */
+input[type="text"],
+input[type="email"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+input[type="search"],
+input[type="tel"],
+input[type="url"],
+input[type="password"],
+textarea,
+select {
+  font-size: 16px !important;
+}
+
 /* Estilos para Markdown renderizado */
 .prose {
   color: hsl(var(--foreground));

@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom"
-import { FolderOpen, Users, User } from "lucide-react"
+import { FolderOpen, Users, User, FileText, DollarSign, Camera, MessageSquare } from "lucide-react"
 import {
   Sidebar,
   SidebarContent,
@@ -33,6 +33,26 @@ export function AppSidebar() {
       title: "Miembros",
       url: "/miembros",
       icon: User,
+    },
+    {
+      title: "Mensajes",
+      url: "/mensajes",
+      icon: MessageSquare,
+    },
+    {
+      title: "Formularios",
+      url: "/formularios",
+      icon: FileText,
+    },
+    {
+      title: "Contabilidad",
+      url: "/contabilidad",
+      icon: DollarSign,
+    },
+    {
+      title: "Cámaras",
+      url: "/camaras",
+      icon: Camera,
     },
   ]
 

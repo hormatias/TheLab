@@ -238,7 +238,7 @@ const SidebarInset = React.forwardRef(({ className, ...props }, ref) => {
     <main
       ref={ref}
       className={cn(
-        "relative flex min-h-screen flex-1 flex-col transition-all duration-300 ease-in-out",
+        "relative flex min-h-screen flex-1 flex-col min-w-0 transition-all duration-300 ease-in-out",
         // Solo agregar margen en desktop cuando el sidebar está abierto
         !isMobile && open && "md:ml-64",
         className
