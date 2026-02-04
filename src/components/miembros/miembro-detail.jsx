@@ -161,12 +161,6 @@ export function MiembroDetail() {
                 <p className="text-lg">{miembro.email}</p>
               </div>
             )}
-            {miembro.id && (
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">ID</p>
-                <p className="text-sm font-mono">{miembro.id}</p>
-              </div>
-            )}
             <div className="pt-4 border-t">
               <Button
                 onClick={() => navigate(`/mensajes/nuevo?from=${miembro.id}`)}
