@@ -21,7 +21,7 @@ Cada fila tiene:
 
 ## Tipos de entidad y campos de `data` (JSON)
 
-Cada entity tiene su `data` como JSONB.
+Cada entity tiene su `data` como JSON.
 
 Estas son las entidades:
 
