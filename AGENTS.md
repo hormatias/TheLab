@@ -3,10 +3,15 @@
 ## ¿Qué es?
 Un proyecto de gestión de laboratorios de código. Personalizado e impulsado con integraciones de frontera.
 
-## ¿Qué son las entities?
-Las entidades son una unidad de la aplicación (proyectos, clientes, miembros, formularios, cámaras, notas) vive en **una sola tabla** `entities`.
+## Base de datos
+Guardamos todo en Supabase. Utilizamos funciones Edge para crear puntos donde enviar la información. Como recibir una descripción y analizarla con IA.
 
-Puedes crear tu propia entity.
+## ¿Qué son las entities?
+Las entidades son una unidad básica del Laboratorio (proyectos, clientes, miembros, formularios, cámaras, notas) vive en tabla llamada `entities` en la base de datos.
+
+Puedes crear tu propia entity tan solo agregando un nuevo type y jsonb.
+
+La idea es aprovechar la flexibilidad de jsonb y markdown para guardar los datos y que sean entendidos por otras plataformas para asegurar la integrabilidad.
 
 Cada fila tiene:
 - **id** (UUID)
@@ -118,11 +123,25 @@ Si `tipo_cliente` es `"particular"`, el cliente no tiene equipo y sí tiene `des
 ```json
 {
   "titulo": "string",
-  "contenido": "string | null" // Markdown
+  "descripcion": "string | null"
 }
 ```
 
-## Editores de Markdown
+La descripción admite Markdown. Al leer, se usa `descripcion ?? contenido` por compatibilidad con notas antiguas.
+
+## Funciones
+
+Todas usan **OPENAI_API_KEY** en Supabase Secrets. El front las llama con **fetch** y cabeceras `Authorization: Bearer <key>` y `apikey: <key>`.
+
+| Función | Qué hace | Dónde se usa |
+|--------|----------|--------------|
+| **transcribe-audio** | Audio (base64) → texto con Whisper | Notas: "Grabar y transcribir" |
+| **generate-fake-data** | Genera datos fake coherentes para campos del formulario (GPT-4o) | Formularios: rellenar con datos de prueba |
+| **detect-acroforms** | Imágenes de páginas PDF (base64) → campos y descripción por página (Vision, máx. 6 págs.) | Formularios: detección de campos al analizar PDF |
+
+Código: `supabase/functions/<nombre>/index.ts`.
+
+## Editor de Markdown
 
 En las pantallas donde se editan campos en Markdown se usa el patrón **vista → Editar → edición**:
 
@@ -138,4 +157,18 @@ Referencia: `nota-detail.jsx` (estado `isEditing`, botón Editar).
 - Para relaciones: `getEntityById(type, id)` y `getEntitiesByIds(type, ids)` en `use-entities.js`.
 
 No hay tablas separadas por tipo; todo es `entities` filtrado por `type`.
+
+## Gestión del repositorio y commits
+
+### Gestión del repo
+
+- Trabajo en la rama `main`.
+- **No commitear:** secretos, `.env`, `.env.local` (ya ignorados con `*.local` en `.gitignore`). No subir `OPENAI_API_KEY` ni claves privadas de Supabase; las Edge Functions usan Supabase Secrets.
+- **Antes de commitear:** revisar con `git status` y `git diff` (o `git diff --stat`) qué se incluye; separar cambios por funcionalidad en distintos commits.
+
+### Forma de commitear
+
+- **Mensajes:** formato `tipo(ámbito): descripción breve`. Tipos: `feat` (nueva funcionalidad), `fix` (corrección), `docs` (solo documentación), `refactor`, `chore`.
+- **Separar por funcionalidad:** un commit por feature o cambio lógico (ej. un commit para el código de una feature y otro para cambios en AGENTS.md). Evitar mezclar en un solo commit documentación y código de features distintas.
+- Los commits recientes del proyecto siguen esta convención (feat/docs separados) como referencia.
 
