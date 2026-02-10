@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useEntities } from "@/hooks/use-entities";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { StickyNote, Loader2, AlertCircle, Plus, Trash2, RefreshCw, Mic, Square } from "lucide-react";
+import { StickyNote, Loader2, AlertCircle, Plus, Trash2, RefreshCw, Mic, Square, Clock } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useVerticalViewport } from "@/hooks/use-vertical-viewport";
 import { cn } from "@/lib/utils";
@@ -41,7 +41,7 @@ export function NotasList() {
     try {
       setLoading(true);
       setError(null);
-      const { data } = await notasApi.list({ orderBy: "titulo", ascending: true });
+      const { data } = await notasApi.list({ orderBy: "updated_at", ascending: false });
       setNotas(data || []);
     } catch (err) {
       console.error("Error al cargar notas:", err);
@@ -66,7 +66,7 @@ export function NotasList() {
         descripcion: descripcion.trim() || null,
       });
       setNotas([...notas, data].sort((a, b) =>
-        (a.titulo || "").localeCompare(b.titulo || "")
+        new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0)
       ));
       setTitulo("");
       setDescripcion("");
@@ -416,6 +416,12 @@ export function NotasList() {
                     <CardDescription className="mt-1 line-clamp-2">
                       {preview(nota.descripcion ?? nota.contenido)}
                     </CardDescription>
+                    {(nota.updated_at || nota.created_at) && (
+                      <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        {new Date(nota.updated_at || nota.created_at).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    )}
                   </div>
                   <Button
                     type="button"

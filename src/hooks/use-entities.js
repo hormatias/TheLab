@@ -28,9 +28,12 @@ export function useEntities(type) {
       }
     });
 
-    // Ordenar por campo dentro de data
-    // Nota: PostgreSQL ordena JSONB como texto, lo cual funciona para nombres
-    query = query.order(`data->>${orderBy}`, { ascending });
+    // Ordenar: updated_at y created_at son columnas de la tabla; el resto va en data (JSONB)
+    if (orderBy === "updated_at" || orderBy === "created_at") {
+      query = query.order(orderBy, { ascending });
+    } else {
+      query = query.order(`data->>${orderBy}`, { ascending });
+    }
 
     const { data, error } = await query;
 
