@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useEntities } from "@/hooks/use-entities";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, AlertCircle, Save, Trash2, Pencil } from "lucide-react";
+import { ArrowLeft, Loader2, AlertCircle, Save, Trash2, Pencil, Mic, Square } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useVerticalViewport } from "@/hooks/use-vertical-viewport";
 import { cn } from "@/lib/utils";
@@ -18,10 +18,14 @@ export function NotaDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [titulo, setTitulo] = useState("");
-  const [contenido, setContenido] = useState("");
+  const [descripcion, setDescripcion] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const streamRef = useRef(null);
 
   const notasApi = useEntities("nota");
 
@@ -39,7 +43,7 @@ export function NotaDetail() {
       }
       setNota(data);
       setTitulo(data.titulo || "");
-      setContenido(data.contenido || "");
+      setDescripcion(data.descripcion ?? data.contenido ?? "");
     } catch (err) {
       console.error("Error al cargar nota:", err);
       setError(err.message);
@@ -50,15 +54,16 @@ export function NotaDetail() {
 
   async function save() {
     if (!titulo.trim()) return;
-    if (titulo === nota?.titulo && contenido === (nota?.contenido ?? "")) return;
+    const currentDesc = nota?.descripcion ?? nota?.contenido ?? "";
+    if (titulo === nota?.titulo && descripcion === currentDesc) return;
 
     try {
       setSaving(true);
       await notasApi.update(id, {
         titulo: titulo.trim(),
-        contenido: contenido.trim() || null,
+        descripcion: descripcion.trim() || null,
       });
-      setNota({ ...nota, titulo: titulo.trim(), contenido: contenido.trim() || null });
+      setNota({ ...nota, titulo: titulo.trim(), descripcion: descripcion.trim() || null });
       setIsEditing(false);
     } catch (err) {
       console.error("Error al guardar nota:", err);
@@ -70,8 +75,87 @@ export function NotaDetail() {
 
   function cancelEdit() {
     setTitulo(nota?.titulo ?? "");
-    setContenido(nota?.contenido ?? "");
+    setDescripcion(nota?.descripcion ?? nota?.contenido ?? "");
     setIsEditing(false);
+  }
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : "audio/webm";
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      const chunks = [];
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size) chunks.push(e.data);
+      };
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+        if (chunks.length === 0) {
+          setRecording(false);
+          return;
+        }
+        const blob = new Blob(chunks, { type: mimeType });
+        setTranscribing(true);
+        try {
+          const base64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const dataUrl = reader.result;
+              resolve(dataUrl ? String(dataUrl).split(",")[1] ?? "" : "");
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+          const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
+          const response = await fetch(`${supabaseUrl}/functions/v1/transcribe-audio`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${supabaseKey}`,
+              "apikey": supabaseKey,
+            },
+            body: JSON.stringify({ audio: base64, contentType: mimeType }),
+          });
+          if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error || `Error ${response.status}`);
+          }
+          const data = await response.json();
+          const text = data?.text ?? "";
+          if (text) {
+            setDescripcion((prev) => (prev ? prev + "\n\n" + text : text));
+            setIsEditing(true);
+          }
+          if (!text && data?.error) throw new Error(data.error);
+        } catch (err) {
+          console.error("Error al transcribir:", err);
+          alert(`Error al transcribir: ${err.message}`);
+        } finally {
+          setTranscribing(false);
+          setRecording(false);
+        }
+      };
+      mediaRecorder.start();
+      setRecording(true);
+    } catch (err) {
+      console.error("Error al acceder al micrófono:", err);
+      if (err.name === "NotAllowedError") {
+        alert("Se ha denegado el acceso al micrófono. Permite el permiso para grabar.");
+      } else {
+        alert(`Error al grabar: ${err.message}`);
+      }
+    }
+  }
+
+  function stopRecording() {
+    const mr = mediaRecorderRef.current;
+    if (mr && mr.state !== "inactive") mr.stop();
   }
 
   async function handleDelete() {
@@ -121,7 +205,8 @@ export function NotaDetail() {
     );
   }
 
-  const hasChanges = titulo !== (nota?.titulo ?? "") || contenido !== (nota?.contenido ?? "");
+  const currentDesc = nota?.descripcion ?? nota?.contenido ?? "";
+  const hasChanges = titulo !== (nota?.titulo ?? "") || descripcion !== currentDesc;
 
   return (
     <div className="space-y-6 w-full max-w-full overflow-x-hidden">
@@ -175,14 +260,14 @@ export function NotaDetail() {
               />
             </div>
             <div>
-              <label htmlFor="contenido" className="text-sm font-medium">
-                Contenido (Markdown)
+              <label htmlFor="descripcion" className="text-sm font-medium">
+                Descripción (Markdown)
               </label>
               <textarea
-                id="contenido"
-                value={contenido}
-                onChange={(e) => setContenido(e.target.value)}
-                placeholder="Escribe el contenido en Markdown. Ej: **negrita**, listas con -, [enlace](url)..."
+                id="descripcion"
+                value={descripcion}
+                onChange={(e) => setDescripcion(e.target.value)}
+                placeholder="Escribe la descripción en Markdown. Ej: **negrita**, listas con -, [enlace](url)..."
                 rows={12}
                 className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-y min-h-[200px] font-mono text-sm"
                 disabled={saving}
@@ -228,16 +313,16 @@ export function NotaDetail() {
         </Card>
       ) : (
         <>
-          {/* Vista: solo el contenido renderizado */}
+          {/* Vista: solo la descripción renderizada */}
           <div className="min-h-[120px]">
-            {contenido?.trim() ? (
+            {descripcion?.trim() ? (
               <div className="prose prose-sm dark:prose-invert max-w-none">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {contenido}
+                  {descripcion}
                 </ReactMarkdown>
               </div>
             ) : (
-              <p className="text-muted-foreground italic">Sin contenido</p>
+              <p className="text-muted-foreground italic">Sin descripción</p>
             )}
           </div>
           <div className="flex justify-end">
@@ -253,6 +338,39 @@ export function NotaDetail() {
           </div>
         </>
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Mic className="h-5 w-5 flex-shrink-0" />
+            <span>{isMobile ? "Grabar y transcribir" : "Grabar y transcribir con Whisper"}</span>
+          </CardTitle>
+          <CardDescription>
+            Graba con el micrófono; el audio se transcribe y se añade a la descripción. Luego puedes editar y guardar.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {recording ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-muted-foreground">Grabando...</span>
+              <Button type="button" variant="outline" size="sm" onClick={stopRecording} title="Detener">
+                <Square className="h-4 w-4 mr-2 fill-current" />
+                Detener
+              </Button>
+            </div>
+          ) : transcribing ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Transcribiendo...
+            </div>
+          ) : (
+            <Button type="button" variant="outline" onClick={startRecording} disabled={transcribing} title="Grabar y transcribir">
+              <Mic className="h-4 w-4 mr-2" />
+              Grabar
+            </Button>
+          )}
+        </CardContent>
+      </Card>
 
       <ConfirmDialog
         open={confirmDelete}

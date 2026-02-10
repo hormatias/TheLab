@@ -16,7 +16,7 @@ export function NotasList() {
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [titulo, setTitulo] = useState("");
-  const [contenido, setContenido] = useState("");
+  const [descripcion, setDescripcion] = useState("");
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -59,13 +59,13 @@ export function NotasList() {
       setCreating(true);
       const { data } = await notasApi.create({
         titulo: titulo.trim(),
-        contenido: contenido.trim() || null,
+        descripcion: descripcion.trim() || null,
       });
       setNotas([...notas, data].sort((a, b) =>
         (a.titulo || "").localeCompare(b.titulo || "")
       ));
       setTitulo("");
-      setContenido("");
+      setDescripcion("");
       setShowForm(false);
     } catch (err) {
       console.error("Error al crear nota:", err);
@@ -98,9 +98,9 @@ export function NotasList() {
     }
   };
 
-  function preview(contenidoStr) {
-    if (!contenidoStr) return "Sin contenido";
-    const firstLine = contenidoStr.split("\n")[0];
+  function preview(descripcionStr) {
+    if (!descripcionStr) return "Sin descripción";
+    const firstLine = descripcionStr.split("\n")[0];
     return firstLine.length > 80 ? firstLine.slice(0, 80) + "…" : firstLine;
   }
 
@@ -196,7 +196,7 @@ export function NotasList() {
           <CardHeader>
             <CardTitle>Crear Nueva Nota</CardTitle>
             <CardDescription>
-              Título obligatorio; el contenido es opcional y admite Markdown
+              Título obligatorio; la descripción es opcional y admite Markdown
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -217,14 +217,14 @@ export function NotasList() {
                 />
               </div>
               <div>
-                <label htmlFor="contenido" className="text-sm font-medium">
-                  Contenido (opcional)
+                <label htmlFor="descripcion" className="text-sm font-medium">
+                  Descripción (opcional)
                 </label>
                 <textarea
-                  id="contenido"
-                  value={contenido}
-                  onChange={(e) => setContenido(e.target.value)}
-                  placeholder="Escribe el contenido..."
+                  id="descripcion"
+                  value={descripcion}
+                  onChange={(e) => setDescripcion(e.target.value)}
+                  placeholder="Escribe la descripción..."
                   rows={4}
                   className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-y min-h-[80px]"
                   disabled={creating}
@@ -258,7 +258,7 @@ export function NotasList() {
                   onClick={() => {
                     setShowForm(false);
                     setTitulo("");
-                    setContenido("");
+                    setDescripcion("");
                   }}
                   disabled={creating}
                 >
@@ -299,7 +299,7 @@ export function NotasList() {
                       {nota.titulo || "Sin título"}
                     </CardTitle>
                     <CardDescription className="mt-1 line-clamp-2">
-                      {preview(nota.contenido)}
+                      {preview(nota.descripcion ?? nota.contenido)}
                     </CardDescription>
                   </div>
                   <Button
