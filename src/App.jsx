@@ -10,6 +10,8 @@ import { ProyectoDetail } from "@/components/proyectos/proyecto-detail";
 import { ClienteDetail } from "@/components/clientes/cliente-detail";
 import { MiembroDetail } from "@/components/miembros/miembro-detail";
 import { FormularioDetail } from "@/components/formularios/formulario-detail";
+import { NotasList } from "@/components/notas/notas-list";
+import { NotaDetail } from "@/components/notas/nota-detail";
 import { MensajesList } from "@/components/mensajes/mensajes-list";
 import { Conversacion } from "@/components/mensajes/conversacion";
 import { NuevoMensaje } from "@/components/mensajes/nuevo-mensaje";
@@ -33,6 +35,8 @@ function App() {
           <Route path="/miembros/:id" element={<MiembroDetail />} />
           <Route path="/formularios" element={<FormulariosList />} />
           <Route path="/formularios/:id" element={<FormularioDetail />} />
+          <Route path="/notas" element={<NotasList />} />
+          <Route path="/notas/:id" element={<NotaDetail />} />
           <Route path="/contabilidad" element={<Contabilidad />} />
           <Route path="/camaras" element={<Camaras />} />
           <Route path="/mensajes" element={<MensajesList />} />

@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom"
-import { FolderOpen, FileText, DollarSign, Camera } from "lucide-react"
+import { FolderOpen, FileText, DollarSign, Camera, StickyNote } from "lucide-react"
 import {
   Sidebar,
   SidebarContent,
@@ -38,6 +38,11 @@ export function AppSidebar() {
       title: "Cámaras de Andorra",
       url: "/camaras",
       icon: Camera,
+    },
+    {
+      title: "Notas",
+      url: "/notas",
+      icon: StickyNote,
     },
   ]
 
