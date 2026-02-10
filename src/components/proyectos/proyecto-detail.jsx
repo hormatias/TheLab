@@ -1,16 +1,15 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useEntities, getEntitiesByIds } from "@/hooks/use-entities";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PercentageSlider } from "@/components/ui/percentage-slider";
-import { Loader2, AlertCircle, ArrowLeft, User, Users, Eye, Edit2, Save, X, UserPlus, UserMinus, CheckSquare, Square, Plus, Trash2, ListTodo, Building2, Sparkles, Calendar, GanttChart, List, DollarSign, Lock, Unlock } from "lucide-react";
+import { Loader2, AlertCircle, ArrowLeft, User, Users, Eye, Edit2, Save, X, UserPlus, UserMinus, CheckSquare, Square, Plus, Trash2, ListTodo, Building2, Sparkles, Calendar, GanttChart, List, DollarSign, Lock, Unlock, FileDown, Mic } from "lucide-react";
 import { useVerticalViewport } from "@/hooks/use-vertical-viewport";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { queryDeepSeek } from "@/lib/deepseek";
-import { AIDialog } from "@/components/ui/ai-dialog";
 import { TareasTimeline } from "@/components/ui/tareas-timeline";
 
 export function ProyectoDetail() {
@@ -23,6 +22,10 @@ export function ProyectoDetail() {
   const [isEditing, setIsEditing] = useState(false);
   const [editingDescripcion, setEditingDescripcion] = useState("");
   const [saving, setSaving] = useState(false);
+  const [recordingDescripcion, setRecordingDescripcion] = useState(false);
+  const [transcribingDescripcion, setTranscribingDescripcion] = useState(false);
+  const mediaRecorderDescRef = useRef(null);
+  const streamDescRef = useRef(null);
   const [miembros, setMiembros] = useState([]);
   const [todosLosMiembros, setTodosLosMiembros] = useState([]);
   const [showAddMember, setShowAddMember] = useState(false);
@@ -39,10 +42,7 @@ export function ProyectoDetail() {
   const [creatingTarea, setCreatingTarea] = useState(false);
   const [updatingTarea, setUpdatingTarea] = useState(null);
   const [deletingTarea, setDeletingTarea] = useState(null);
-  const [showAIResponse, setShowAIResponse] = useState(false);
-  const [aiResponse, setAiResponse] = useState("");
-  const [loadingAI, setLoadingAI] = useState(false);
-  const [aiError, setAiError] = useState(null);
+  const [showAplicarInstruccionDialog, setShowAplicarInstruccionDialog] = useState(false);
   const [generandoTareas, setGenerandoTareas] = useState(false);
   const [eliminandoTodas, setEliminandoTodas] = useState(false);
   const [vistaTimeline, setVistaTimeline] = useState(() => {
@@ -64,12 +64,27 @@ export function ProyectoDetail() {
   const proyectosApi = useEntities("proyecto");
   const clientesApi = useEntities("cliente");
   const miembrosApi = useEntities("miembro");
+  const instruccionesApi = useEntities("instruccion");
+
+  const [instrucciones, setInstrucciones] = useState([]);
+  const [selectedInstruccionId, setSelectedInstruccionId] = useState("");
+  const [importingInstruccion, setImportingInstruccion] = useState(false);
 
   useEffect(() => {
     loadProyecto();
     loadTodosLosMiembros();
     loadTodosLosClientes();
+    loadInstrucciones();
   }, [id]);
+
+  async function loadInstrucciones() {
+    try {
+      const { data } = await instruccionesApi.list({ orderBy: "updated_at", ascending: false });
+      setInstrucciones(data || []);
+    } catch (err) {
+      console.warn("No se pudieron cargar instrucciones:", err);
+    }
+  }
 
   useEffect(() => {
     localStorage.setItem('tareas-vista-timeline', vistaTimeline.toString());
@@ -275,6 +290,165 @@ export function ProyectoDetail() {
   function handleCancelEdit() {
     setEditingDescripcion(proyecto?.descripcion || "");
     setIsEditing(false);
+  }
+
+  async function startRecordingDescripcion() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamDescRef.current = stream;
+      let mimeType = "audio/webm";
+      if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+        mimeType = "audio/webm;codecs=opus";
+      } else if (MediaRecorder.isTypeSupported("audio/webm")) {
+        mimeType = "audio/webm";
+      } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
+        mimeType = "audio/mp4";
+      }
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderDescRef.current = mediaRecorder;
+      const chunks = [];
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size) chunks.push(e.data);
+      };
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        streamDescRef.current = null;
+        if (chunks.length === 0) {
+          setRecordingDescripcion(false);
+          return;
+        }
+        const blob = new Blob(chunks, { type: mimeType });
+        setTranscribingDescripcion(true);
+        try {
+          const base64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const dataUrl = reader.result;
+              resolve(dataUrl ? String(dataUrl).split(",")[1] ?? "" : "");
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+          const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
+          const response = await fetch(`${supabaseUrl}/functions/v1/transcribe-audio`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${supabaseKey}`,
+              "apikey": supabaseKey,
+            },
+            body: JSON.stringify({ audio: base64, contentType: mimeType }),
+          });
+          if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error || `Error ${response.status}`);
+          }
+          const data = await response.json();
+          const text = data?.text ?? "";
+          if (text) {
+            setEditingDescripcion((prev) => (prev ? prev.trim() + "\n\n" + text : text));
+          }
+          if (!text && data?.error) throw new Error(data.error);
+        } catch (err) {
+          console.error("Error al transcribir:", err);
+          alert(`Error al transcribir: ${err.message}`);
+        } finally {
+          setTranscribingDescripcion(false);
+          setRecordingDescripcion(false);
+        }
+      };
+      mediaRecorder.start();
+      setRecordingDescripcion(true);
+    } catch (err) {
+      console.error("Error al acceder al micrófono:", err);
+      if (err.name === "NotAllowedError") {
+        alert("Se ha denegado el acceso al micrófono. Permite el permiso para grabar.");
+      } else {
+        alert(`Error al grabar: ${err.message}`);
+      }
+    }
+  }
+
+  function stopRecordingDescripcion() {
+    const mr = mediaRecorderDescRef.current;
+    if (mr && mr.state !== "inactive") mr.stop();
+  }
+
+  /** Obtiene el objeto data del proyecto para enviar a la IA (_raw.data o construido desde proyecto). */
+  function getProjectDataForAI() {
+    if (proyecto?._raw?.data && typeof proyecto._raw.data === "object") {
+      return proyecto._raw.data;
+    }
+    const keys = [
+      "nombre", "descripcion", "cliente_id", "tareas", "presupuesto", "moneda",
+      "tipo_presupuesto", "frecuencia_recurrencia", "numero_cuotas",
+      "fecha_inicio_primer_pago", "fechas_cobro_personalizadas", "miembro_ids"
+    ];
+    const data = {};
+    keys.forEach((k) => {
+      if (proyecto && k in proyecto) data[k] = proyecto[k];
+    });
+    return data;
+  }
+
+  /** Extrae JSON del texto de respuesta (quita bloques ```json ... ``` si existen). */
+  function extractJsonFromResponse(text) {
+    const trimmed = text.trim();
+    const codeBlockMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (codeBlockMatch) return codeBlockMatch[1].trim();
+    const first = trimmed.indexOf("{");
+    const last = trimmed.lastIndexOf("}");
+    if (first !== -1 && last !== -1 && last > first) return trimmed.slice(first, last + 1);
+    return trimmed;
+  }
+
+  /** Aplica una instrucción al proyecto entero: envía entity + instrucción a IA y actualiza el proyecto. */
+  async function aplicarInstruccionAlProyecto() {
+    if (!selectedInstruccionId || !proyecto) return;
+    const instruccion = instrucciones.find((i) => i.id === selectedInstruccionId);
+    if (!instruccion) return;
+
+    const projectData = getProjectDataForAI();
+    const contenidoInstruccion = [
+      instruccion.titulo ? `# ${instruccion.titulo}` : "",
+      instruccion.descripcion ?? instruccion.contenido ?? "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    const systemPrompt = `Eres un asistente que actualiza proyectos. Recibes un proyecto como JSON (objeto "data" de la entidad) y una instrucción en texto. Debes aplicar la instrucción al proyecto: actualizar descripción, tareas, prioridades, presupuesto o lo que la instrucción indique. La descripción debe ser visión actualizada, máximo 5 párrafos; si algo está obsoleto, bórralo.
+Estructura del proyecto: nombre (string), descripcion (string|null, Markdown), cliente_id (uuid|null), tareas (array de { id, nombre, completada, fecha_inicio, fecha_fin, created_at }), presupuesto (number|null), moneda (string), tipo_presupuesto, frecuencia_recurrencia, numero_cuotas, fecha_inicio_primer_pago, fechas_cobro_personalizadas (array), miembro_ids (array de uuid).
+Responde ÚNICAMENTE con el objeto JSON del proyecto actualizado (solo el objeto data). No cambies los id de las tareas existentes. Mantén cliente_id y miembro_ids como UUIDs válidos o null/array. Fechas en YYYY-MM-DD. Sin explicaciones ni texto antes o después del JSON.`;
+
+    const userMessage = `Proyecto actual (JSON):\n${JSON.stringify(projectData, null, 2)}\n\n---\n\nInstrucción a aplicar:\n\n${contenidoInstruccion}`;
+
+    try {
+      setImportingInstruccion(true);
+      const rawResponse = await queryDeepSeek(systemPrompt, userMessage);
+      const jsonStr = extractJsonFromResponse(rawResponse);
+      let parsedData;
+      try {
+        parsedData = JSON.parse(jsonStr);
+      } catch (e) {
+        throw new Error("La respuesta no es un JSON válido. Intenta de nuevo.");
+      }
+      if (typeof parsedData !== "object" || parsedData === null) {
+        throw new Error("La respuesta no es un objeto válido.");
+      }
+      if (parsedData.tareas != null && !Array.isArray(parsedData.tareas)) {
+        throw new Error("El campo tareas debe ser un array.");
+      }
+      await proyectosApi.update(id, parsedData);
+      setSelectedInstruccionId("");
+      await loadProyecto();
+      setShowAplicarInstruccionDialog(false);
+    } catch (err) {
+      console.error("Error al aplicar instrucción:", err);
+      alert(err?.message || `No se pudo aplicar la instrucción: ${err}`);
+    } finally {
+      setImportingInstruccion(false);
+    }
   }
 
   async function updatePresupuesto() {
@@ -812,48 +986,6 @@ export function ProyectoDetail() {
     }
   }
 
-  async function consultarAI() {
-    if (!proyecto) return;
-
-    setShowAIResponse(true);
-    setLoadingAI(true);
-    setAiError(null);
-    setAiResponse("");
-
-    try {
-      const tareasPendientes = tareas.filter(t => !t.completada).map(t => t.nombre);
-      const tareasCompletadas = tareas.filter(t => t.completada).map(t => t.nombre);
-      const nombresMiembros = miembros.map(m => m.nombre);
-
-      const systemPrompt = `Eres un asistente experto en gestión de proyectos. 
-Tienes acceso a la siguiente información del proyecto:
-
-PROYECTO: ${proyecto.nombre}
-${proyecto.descripcion ? `DESCRIPCIÓN:\n${proyecto.descripcion}` : "DESCRIPCIÓN: Sin descripción"}
-CLIENTE: ${proyecto.clientes ? proyecto.clientes.nombre : "Sin cliente asignado"}
-MIEMBROS: ${nombresMiembros.length > 0 ? nombresMiembros.join(", ") : "Sin miembros asignados"}
-TAREAS:
-  - Pendientes (${tareasPendientes.length}): ${tareasPendientes.length > 0 ? tareasPendientes.join(", ") : "Ninguna"}
-  - Completadas (${tareasCompletadas.length}): ${tareasCompletadas.length > 0 ? tareasCompletadas.join(", ") : "Ninguna"}
-
-Analiza este proyecto y proporciona insights útiles, sugerencias de mejora, o cualquier información relevante que pueda ayudar en la gestión del proyecto. Responde de manera concisa y práctica.`;
-
-      const response = await queryDeepSeek(systemPrompt);
-      setAiResponse(response);
-    } catch (err) {
-      console.error("Error al consultar AI:", err);
-      setAiError(err.message);
-    } finally {
-      setLoadingAI(false);
-    }
-  }
-
-  function cerrarAIDialog() {
-    setShowAIResponse(false);
-    setAiResponse("");
-    setAiError(null);
-  }
-
   async function generarTareasConIA() {
     if (!proyecto) return;
 
@@ -1006,17 +1138,13 @@ Responde SOLO con el JSON array, sin explicaciones adicionales.`;
         </div>
         <Button
           variant="outline"
-          onClick={consultarAI}
-          disabled={loadingAI}
+          onClick={() => setShowAplicarInstruccionDialog(true)}
+          disabled={instrucciones.length === 0}
           size={isMobile ? "icon" : "default"}
-          title="Consultar AI sobre este proyecto"
+          title={instrucciones.length === 0 ? "No hay instrucciones" : "Aplicar instrucción al proyecto"}
         >
-          {loadingAI ? (
-            <Loader2 className={cn("h-4 w-4 animate-spin", !isMobile && "mr-2")} />
-          ) : (
-            <Sparkles className={cn("h-4 w-4", !isMobile && "mr-2")} />
-          )}
-          {!isMobile && "Consultar AI"}
+          <FileDown className={cn("h-4 w-4", !isMobile && "mr-2")} />
+          {!isMobile && "Aplicar instrucción"}
         </Button>
       </div>
 
@@ -1416,6 +1544,28 @@ Responde SOLO con el JSON array, sin explicaciones adicionales.`;
           <div>
             {isEditing ? (
               <div className="space-y-4">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium">Descripción</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                    onClick={() => (recordingDescripcion ? stopRecordingDescripcion() : startRecordingDescripcion())}
+                    disabled={saving || transcribingDescripcion}
+                    title={recordingDescripcion ? "Parar grabación" : transcribingDescripcion ? "Transcribiendo..." : "Grabar con voz y añadir a la descripción"}
+                    aria-label={recordingDescripcion ? "Parar grabación" : "Grabar con voz"}
+                  >
+                    {transcribingDescripcion ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : recordingDescripcion ? (
+                      <Square className="h-4 w-4" />
+                    ) : (
+                      <Mic className="h-4 w-4" />
+                    )}
+                    {!isMobile && (transcribingDescripcion ? " Transcribiendo..." : recordingDescripcion ? " Parar" : " Grabar con voz")}
+                  </Button>
+                </div>
                 <textarea
                   value={editingDescripcion}
                   onChange={(e) => setEditingDescripcion(e.target.value)}
@@ -1425,7 +1575,7 @@ Responde SOLO con el JSON array, sin explicaciones adicionales.`;
                   disabled={saving}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Puedes usar Markdown para formatear el texto
+                  Puedes usar Markdown para formatear el texto. También puedes grabar con el micrófono y se añadirá la transcripción.
                 </p>
                 <div className="flex gap-2">
                   <Button
@@ -1936,15 +2086,75 @@ Responde SOLO con el JSON array, sin explicaciones adicionales.`;
         </CardContent>
       </Card>
 
-      {/* Dialog de respuesta de AI */}
-      <AIDialog
-        open={showAIResponse}
-        onClose={cerrarAIDialog}
-        loading={loadingAI}
-        error={aiError}
-        response={aiResponse}
-        onRetry={consultarAI}
-      />
+      {/* Diálogo Aplicar instrucción al proyecto */}
+      {showAplicarInstruccionDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <FileDown className="h-5 w-5" />
+                  Aplicar instrucción al proyecto
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowAplicarInstruccionDialog(false)}
+                  title="Cerrar"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label htmlFor="instruccion-aplicar-dialog" className="block text-sm font-medium mb-2">
+                  Elegir instrucción
+                </label>
+                <select
+                  id="instruccion-aplicar-dialog"
+                  value={selectedInstruccionId}
+                  onChange={(e) => setSelectedInstruccionId(e.target.value)}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  disabled={importingInstruccion}
+                >
+                  <option value="">Elegir instrucción...</option>
+                  {instrucciones.map((inst) => (
+                    <option key={inst.id} value={inst.id}>
+                      {inst.titulo || "Sin título"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowAplicarInstruccionDialog(false)}
+                  disabled={importingInstruccion}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={aplicarInstruccionAlProyecto}
+                  disabled={importingInstruccion || !selectedInstruccionId || saving}
+                >
+                  {importingInstruccion ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Aplicando...
+                    </>
+                  ) : (
+                    <>
+                      <FileDown className="h-4 w-4 mr-2" />
+                      Aplicar al proyecto
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
