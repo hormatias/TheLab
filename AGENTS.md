@@ -4,7 +4,7 @@
 Un proyecto de gestión de laboratorios de código. Personalizado e impulsado con integraciones de frontera.
 
 ## Base de datos
-Guardamos todo en Supabase. Utilizamos funciones Edge para crear puntos donde enviar la información. Como recibir una descripción y analizarla con IA.
+Guardamos todo en Supabase. Utilizamos funciones Edge para crear puntos donde enviar la información. Como recibir un audio y analizarlo con IA.
 
 ## ¿Qué son las entities?
 Las entidades son una unidad básica del Laboratorio (proyectos, clientes, miembros, formularios, cámaras, notas) vive en tabla llamada `entities` en la base de datos.
@@ -21,14 +21,7 @@ Cada fila tiene:
 
 ## Tipos de entidad y campos de `data` (JSON)
 
-Cada entity tiene su `data` como JSONB. Estructura por entity.
-
-- Una entity `"proyecto"` tendrá en su `data`:  
-  `{ "nombre": "...", "descripcion": "...", ... }`
-- Un `"cliente"`:  
-  `{ "nombre": "...", "tipo_cliente": "...", "equipo": [...], ... }`
-- Un `"miembro"`:  
-  `{ "nombre": "...", "email": "..." }`
+Cada entity tiene su `data` como JSONB.
 
 **Nota:** Los campos comunes (`id`, `type`, `created_at`, `updated_at`) 
 
