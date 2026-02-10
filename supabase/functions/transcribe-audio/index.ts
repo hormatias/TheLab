@@ -86,7 +86,7 @@ Deno.serve(async (req: Request) => {
             messages: [
               {
                 role: "user",
-                content: `Dado el siguiente texto de una nota, genera un título corto (máximo 5-8 palabras) en el mismo idioma. Responde únicamente con el título, sin comillas ni explicaciones.\n\n${text}`,
+                content: `Dado el siguiente texto de una instrucción, genera un título corto (máximo 5-8 palabras) en el mismo idioma. Responde únicamente con el título, sin comillas ni explicaciones.\n\n${text}`,
               },
             ],
             max_tokens: 50,

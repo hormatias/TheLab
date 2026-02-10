@@ -10,8 +10,8 @@ import { ProyectoDetail } from "@/components/proyectos/proyecto-detail";
 import { ClienteDetail } from "@/components/clientes/cliente-detail";
 import { MiembroDetail } from "@/components/miembros/miembro-detail";
 import { FormularioDetail } from "@/components/formularios/formulario-detail";
-import { NotasList } from "@/components/notas/notas-list";
-import { NotaDetail } from "@/components/notas/nota-detail";
+import { InstruccionesList } from "@/components/instrucciones/instrucciones-list";
+import { InstruccionDetail } from "@/components/instrucciones/instruccion-detail";
 import { MensajesList } from "@/components/mensajes/mensajes-list";
 import { Conversacion } from "@/components/mensajes/conversacion";
 import { NuevoMensaje } from "@/components/mensajes/nuevo-mensaje";
@@ -23,8 +23,8 @@ function App() {
     <BrowserRouter>
       <Dashboard>
         <Routes>
-          <Route path="/" element={<Navigate to="/proyectos" replace />} />
-          <Route path="/vista-general" element={<Navigate to="/proyectos" replace />} />
+          <Route path="/" element={<Navigate to="/instrucciones" replace />} />
+          <Route path="/vista-general" element={<Navigate to="/instrucciones" replace />} />
           <Route path="/proyectos/lista" element={<ProyectosList />} />
           <Route path="/proyectos/nuevo" element={<ProyectoNuevo />} />
           <Route path="/proyectos/:id" element={<ProyectoDetail />} />
@@ -35,8 +35,8 @@ function App() {
           <Route path="/miembros/:id" element={<MiembroDetail />} />
           <Route path="/formularios" element={<FormulariosList />} />
           <Route path="/formularios/:id" element={<FormularioDetail />} />
-          <Route path="/notas" element={<NotasList />} />
-          <Route path="/notas/:id" element={<NotaDetail />} />
+          <Route path="/instrucciones" element={<InstruccionesList />} />
+          <Route path="/instrucciones/:id" element={<InstruccionDetail />} />
           <Route path="/contabilidad" element={<Contabilidad />} />
           <Route path="/camaras" element={<Camaras />} />
           <Route path="/mensajes" element={<MensajesList />} />

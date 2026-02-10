@@ -23,8 +23,8 @@ const getPageTitle = (pathname) => {
   if (pathname.startsWith("/camaras")) {
     return "Cámaras de Andorra";
   }
-  if (pathname.startsWith("/notas")) {
-    return "Notas";
+  if (pathname.startsWith("/instrucciones")) {
+    return "Instrucciones";
   }
   return "TheLab";
 };
@@ -40,7 +40,7 @@ export function Header() {
       const proyectoMatch = location.pathname.match(/^\/proyectos\/([^/]+)$/);
       const miembroMatch = location.pathname.match(/^\/miembros\/([^/]+)$/);
       const formularioMatch = location.pathname.match(/^\/formularios\/([^/]+)$/);
-      const notaMatch = location.pathname.match(/^\/notas\/([^/]+)$/);
+      const instruccionMatch = location.pathname.match(/^\/instrucciones\/([^/]+)$/);
 
       if (clienteMatch) {
         const id = clienteMatch[1];
@@ -90,17 +90,17 @@ export function Header() {
         } catch (err) {
           setPageTitle("Formularios");
         }
-      } else if (notaMatch) {
-        const id = notaMatch[1];
+      } else if (instruccionMatch) {
+        const id = instruccionMatch[1];
         try {
-          const { data } = await getEntityById("nota", id);
+          const { data } = await getEntityById("instruccion", id);
           if (data) {
-            setPageTitle(data.titulo || "Notas");
+            setPageTitle(data.titulo || "Instrucciones");
           } else {
-            setPageTitle("Notas");
+            setPageTitle("Instrucciones");
           }
         } catch (err) {
-          setPageTitle("Notas");
+          setPageTitle("Instrucciones");
         }
       } else {
         // Ruta normal, usar el título genérico

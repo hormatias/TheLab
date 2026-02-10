@@ -7,7 +7,7 @@ Un proyecto de gestión de laboratorios de código. Personalizado e impulsado co
 Guardamos todo en Supabase. Utilizamos funciones Edge para crear puntos donde enviar la información. Como recibir un audio y analizarlo con IA.
 
 ## ¿Qué son las entities?
-Las entidades son una unidad básica del Laboratorio (proyectos, clientes, miembros, formularios, cámaras, notas) vive en tabla llamada `entities` en la base de datos.
+Las entidades son una unidad básica del Laboratorio (proyectos, clientes, miembros, formularios, cámaras, instrucciones) vive en tabla llamada `entities` en la base de datos.
 
 Puedes crear tu propia entity tan solo agregando un nuevo type y jsonb.
 
@@ -109,7 +109,7 @@ Si `tipo_cliente` es `"particular"`, el cliente no tiene equipo y sí tiene `des
 }
 ```
 
-### nota
+### instruccion
 
 ```json
 {
@@ -118,7 +118,7 @@ Si `tipo_cliente` es `"particular"`, el cliente no tiene equipo y sí tiene `des
 }
 ```
 
-La descripción admite Markdown. Al leer, se usa `descripcion ?? contenido` por compatibilidad con notas antiguas.
+La descripción admite Markdown. Al leer, se usa `descripcion ?? contenido` por compatibilidad con instrucciones antiguas.
 
 ## Funciones
 
@@ -126,7 +126,7 @@ Todas usan **OPENAI_API_KEY** en Supabase Secrets. El front las llama con **fetc
 
 | Función | Qué hace | Dónde se usa |
 |--------|----------|--------------|
-| **transcribe-audio** | Audio (base64) → texto con Whisper | Notas: "Grabar y transcribir" |
+| **transcribe-audio** | Audio (base64) → texto con Whisper | Instrucciones: grabar y transcribir |
 | **generate-fake-data** | Genera datos fake coherentes para campos del formulario (GPT-4o) | Formularios: rellenar con datos de prueba |
 | **detect-acroforms** | Imágenes de páginas PDF (base64) → campos y descripción por página (Vision, máx. 6 págs.) | Formularios: detección de campos al analizar PDF |
 
@@ -139,7 +139,7 @@ En las pantallas donde se editan campos en Markdown se usa el patrón **vista �
 - **Por defecto:** modo vista (solo lectura). El contenido se muestra renderizado con `react-markdown`; no se duplica editor y vista previa.
 - **Botón "Editar":** pasa al modo edición (textarea con el Markdown en crudo). Guardar persiste y vuelve a vista; Cancelar descarta y vuelve a vista.
 
-Referencia: `nota-detail.jsx` (estado `isEditing`, botón Editar).
+Referencia: `instruccion-detail.jsx` (estado `isEditing`, botón Editar).
 
 ## Cómo se usan en código
 

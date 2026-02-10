@@ -20,8 +20,8 @@ export function AppSidebar() {
 
   const items = [
     {
-      title: "Notas",
-      url: "/notas",
+      title: "Instrucciones",
+      url: "/instrucciones",
       icon: StickyNote,
     },
     {

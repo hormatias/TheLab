@@ -10,11 +10,11 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useVerticalViewport } from "@/hooks/use-vertical-viewport";
 import { cn } from "@/lib/utils";
 
-export function NotaDetail() {
+export function InstruccionDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { isMobile } = useVerticalViewport();
-  const [nota, setNota] = useState(null);
+  const [instruccion, setInstruccion] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [titulo, setTitulo] = useState("");
@@ -23,25 +23,25 @@ export function NotaDetail() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
-  const notasApi = useEntities("nota");
+  const instruccionesApi = useEntities("instruccion");
 
   useEffect(() => {
-    loadNota();
+    loadInstruccion();
   }, [id]);
 
-  async function loadNota() {
+  async function loadInstruccion() {
     try {
       setLoading(true);
       setError(null);
-      const { data } = await notasApi.get(id);
+      const { data } = await instruccionesApi.get(id);
       if (!data) {
-        throw new Error("Nota no encontrada");
+        throw new Error("Instrucción no encontrada");
       }
-      setNota(data);
+      setInstruccion(data);
       setTitulo(data.titulo || "");
       setDescripcion(data.descripcion ?? data.contenido ?? "");
     } catch (err) {
-      console.error("Error al cargar nota:", err);
+      console.error("Error al cargar instrucción:", err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -50,19 +50,19 @@ export function NotaDetail() {
 
   async function save() {
     if (!titulo.trim()) return;
-    const currentDesc = nota?.descripcion ?? nota?.contenido ?? "";
-    if (titulo === nota?.titulo && descripcion === currentDesc) return;
+    const currentDesc = instruccion?.descripcion ?? instruccion?.contenido ?? "";
+    if (titulo === instruccion?.titulo && descripcion === currentDesc) return;
 
     try {
       setSaving(true);
-      await notasApi.update(id, {
+      await instruccionesApi.update(id, {
         titulo: titulo.trim(),
         descripcion: descripcion.trim() || null,
       });
-      setNota({ ...nota, titulo: titulo.trim(), descripcion: descripcion.trim() || null });
+      setInstruccion({ ...instruccion, titulo: titulo.trim(), descripcion: descripcion.trim() || null });
       setIsEditing(false);
     } catch (err) {
-      console.error("Error al guardar nota:", err);
+      console.error("Error al guardar instrucción:", err);
       alert(`Error: ${err.message}`);
     } finally {
       setSaving(false);
@@ -70,18 +70,18 @@ export function NotaDetail() {
   }
 
   function cancelEdit() {
-    setTitulo(nota?.titulo ?? "");
-    setDescripcion(nota?.descripcion ?? nota?.contenido ?? "");
+    setTitulo(instruccion?.titulo ?? "");
+    setDescripcion(instruccion?.descripcion ?? instruccion?.contenido ?? "");
     setIsEditing(false);
   }
 
   async function handleDelete() {
     try {
       setConfirmDelete(false);
-      await notasApi.remove(id);
-      navigate("/notas");
+      await instruccionesApi.remove(id);
+      navigate("/instrucciones");
     } catch (err) {
-      console.error("Error al eliminar nota:", err);
+      console.error("Error al eliminar instrucción:", err);
       alert(`Error: ${err.message}`);
     }
   }
@@ -91,7 +91,7 @@ export function NotaDetail() {
       <Card>
         <CardContent className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <span className="ml-2 text-muted-foreground">Cargando nota...</span>
+          <span className="ml-2 text-muted-foreground">Cargando instrucción...</span>
         </CardContent>
       </Card>
     );
@@ -104,14 +104,14 @@ export function NotaDetail() {
           <div className="flex flex-col items-center justify-center space-y-4">
             <AlertCircle className="h-8 w-8 text-destructive" />
             <div className="text-center max-w-md">
-              <p className="font-medium">Error al cargar nota</p>
+              <p className="font-medium">Error al cargar instrucción</p>
               <p className="text-sm text-muted-foreground mt-2">{error}</p>
               <div className="flex gap-2 justify-center mt-4">
-                <Button onClick={() => navigate("/notas")} variant="outline">
+                <Button onClick={() => navigate("/instrucciones")} variant="outline">
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Volver
                 </Button>
-                <Button onClick={loadNota} variant="outline">
+                <Button onClick={loadInstruccion} variant="outline">
                   Reintentar
                 </Button>
               </div>
@@ -122,15 +122,15 @@ export function NotaDetail() {
     );
   }
 
-  const currentDesc = nota?.descripcion ?? nota?.contenido ?? "";
-  const hasChanges = titulo !== (nota?.titulo ?? "") || descripcion !== currentDesc;
+  const currentDesc = instruccion?.descripcion ?? instruccion?.contenido ?? "";
+  const hasChanges = titulo !== (instruccion?.titulo ?? "") || descripcion !== currentDesc;
 
   return (
     <div className="space-y-6 w-full max-w-full overflow-x-hidden">
       {/* Barra: volver | título | editar */}
       <div className="flex items-center gap-2 sm:gap-4 w-full">
         <Button
-          onClick={() => navigate("/notas")}
+          onClick={() => navigate("/instrucciones")}
           variant="ghost"
           size="icon"
           className="flex-shrink-0"
@@ -138,8 +138,8 @@ export function NotaDetail() {
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="w-0 flex-1 min-w-0">
-          <h2 className="text-2xl font-semibold tracking-tight truncate" title={nota?.titulo}>
-            {nota?.titulo || "Nota"}
+          <h2 className="text-2xl font-semibold tracking-tight truncate" title={instruccion?.titulo}>
+            {instruccion?.titulo || "Instrucción"}
           </h2>
         </div>
         {!isEditing ? (
@@ -147,7 +147,7 @@ export function NotaDetail() {
             variant="outline"
             size={isMobile ? "icon" : "sm"}
             onClick={() => setIsEditing(true)}
-            title="Editar nota"
+            title="Editar instrucción"
             className="flex-shrink-0"
           >
             <Pencil className={cn("h-4 w-4", !isMobile && "mr-2")} />
@@ -159,7 +159,7 @@ export function NotaDetail() {
       {isEditing ? (
         <Card>
           <CardHeader>
-            <CardTitle>Editar nota</CardTitle>
+            <CardTitle>Editar instrucción</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -171,7 +171,7 @@ export function NotaDetail() {
                 type="text"
                 value={titulo}
                 onChange={(e) => setTitulo(e.target.value)}
-                placeholder="Título de la nota"
+                placeholder="Título de la instrucción"
                 className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 disabled={saving}
               />
@@ -220,7 +220,7 @@ export function NotaDetail() {
                 size={isMobile ? "icon" : "default"}
                 className="text-destructive hover:text-destructive hover:bg-destructive/10"
                 onClick={() => setConfirmDelete(true)}
-                title="Eliminar nota"
+                title="Eliminar instrucción"
               >
                 <Trash2 className={cn("h-4 w-4", !isMobile && "mr-2")} />
                 {!isMobile && "Eliminar"}
@@ -248,7 +248,7 @@ export function NotaDetail() {
               size="sm"
               className="text-destructive hover:text-destructive hover:bg-destructive/10"
               onClick={() => setConfirmDelete(true)}
-              title="Eliminar nota"
+              title="Eliminar instrucción"
             >
               Eliminar
             </Button>
@@ -260,8 +260,8 @@ export function NotaDetail() {
         open={confirmDelete}
         onConfirm={handleDelete}
         onCancel={() => setConfirmDelete(false)}
-        title="Eliminar Nota"
-        message={`¿Estás seguro de que quieres eliminar la nota "${nota?.titulo}"? Esta acción no se puede deshacer.`}
+        title="Eliminar Instrucción"
+        message={`¿Estás seguro de que quieres eliminar la instrucción "${instruccion?.titulo}"? Esta acción no se puede deshacer.`}
       />
     </div>
   );
