@@ -42,6 +42,8 @@
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Esta app necesita acceso a la red local para conectarse al servidor de desarrollo durante el desarrollo.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>La app usa el micrófono para grabar notas de voz y transcribirlas a texto.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_http._tcp</string>

@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useEntities } from "@/hooks/use-entities";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { StickyNote, Loader2, AlertCircle, Plus, Trash2, RefreshCw } from "lucide-react";
+import { StickyNote, Loader2, AlertCircle, Plus, Trash2, RefreshCw, Mic, Square } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useVerticalViewport } from "@/hooks/use-vertical-viewport";
 import { cn } from "@/lib/utils";
@@ -20,6 +20,10 @@ export function NotasList() {
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const streamRef = useRef(null);
 
   const notasApi = useEntities("nota");
 
@@ -73,6 +77,92 @@ export function NotasList() {
     } finally {
       setCreating(false);
     }
+  }
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      // Safari/WebKit (iOS) no soporta audio/webm; usar audio/mp4 para que la grabación funcione
+      let mimeType = "audio/webm";
+      if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+        mimeType = "audio/webm;codecs=opus";
+      } else if (MediaRecorder.isTypeSupported("audio/webm")) {
+        mimeType = "audio/webm";
+      } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
+        mimeType = "audio/mp4";
+      }
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = mediaRecorder;
+      const chunks = [];
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size) chunks.push(e.data);
+      };
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+        if (chunks.length === 0) {
+          setRecording(false);
+          return;
+        }
+        const blob = new Blob(chunks, { type: mimeType });
+        setTranscribing(true);
+        try {
+          const base64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const dataUrl = reader.result;
+              resolve(dataUrl ? String(dataUrl).split(",")[1] ?? "" : "");
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+          const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
+          const response = await fetch(`${supabaseUrl}/functions/v1/transcribe-audio`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${supabaseKey}`,
+              "apikey": supabaseKey,
+            },
+            body: JSON.stringify({ audio: base64, contentType: mimeType }),
+          });
+          if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error || `Error ${response.status}`);
+          }
+          const data = await response.json();
+          const text = data?.text ?? "";
+          if (text) {
+            setDescripcion((prev) => (prev ? prev + "\n\n" + text : text));
+            const suggestedTitle = data?.title?.trim();
+            if (suggestedTitle) setTitulo((prev) => (prev.trim() ? prev : suggestedTitle));
+          }
+          if (!text && data?.error) throw new Error(data.error);
+        } catch (err) {
+          console.error("Error al transcribir:", err);
+          alert(`Error al transcribir: ${err.message}`);
+        } finally {
+          setTranscribing(false);
+          setRecording(false);
+        }
+      };
+      mediaRecorder.start();
+      setRecording(true);
+    } catch (err) {
+      console.error("Error al acceder al micrófono:", err);
+      if (err.name === "NotAllowedError") {
+        alert("Se ha denegado el acceso al micrófono. Permite el permiso para grabar.");
+      } else {
+        alert(`Error al grabar: ${err.message}`);
+      }
+    }
+  }
+
+  function stopRecording() {
+    const mr = mediaRecorderRef.current;
+    if (mr && mr.state !== "inactive") mr.stop();
   }
 
   const handleDeleteClick = (id, tituloNota) => {
@@ -161,37 +251,10 @@ export function NotasList() {
     );
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Notas</h2>
-          <p className="text-muted-foreground">
-            {notas.length} {notas.length === 1 ? "nota" : "notas"}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            onClick={loadNotas}
-            variant="outline"
-            size={isMobile ? "icon" : "sm"}
-            title="Actualizar"
-          >
-            <RefreshCw className={cn("h-4 w-4", !isMobile && "mr-2")} />
-            {!isMobile && "Actualizar"}
-          </Button>
-          <Button
-            onClick={() => setShowForm(!showForm)}
-            size={isMobile ? "icon" : "sm"}
-            title="Nueva Nota"
-          >
-            <Plus className={cn("h-4 w-4", !isMobile && "mr-2")} />
-            {!isMobile && "Nueva Nota"}
-          </Button>
-        </div>
-      </div>
-
-      {showForm && (
+  // Vista solo formulario al crear nota: sin título "Notas", sin lista ni botones
+  if (showForm) {
+    return (
+      <div className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>Crear Nueva Nota</CardTitle>
@@ -217,9 +280,29 @@ export function NotasList() {
                 />
               </div>
               <div>
-                <label htmlFor="descripcion" className="text-sm font-medium">
-                  Descripción (opcional)
-                </label>
+                <div className="flex items-center justify-between gap-2">
+                  <label htmlFor="descripcion" className="text-sm font-medium">
+                    Descripción (opcional)
+                  </label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() => (recording ? stopRecording() : startRecording())}
+                    disabled={creating || transcribing}
+                    title={recording ? "Parar grabación" : transcribing ? "Transcribiendo..." : "Grabar con voz"}
+                    aria-label={recording ? "Parar grabación" : "Grabar con voz"}
+                  >
+                    {transcribing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : recording ? (
+                      <Square className="h-4 w-4" />
+                    ) : (
+                      <Mic className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
                 <textarea
                   id="descripcion"
                   value={descripcion}
@@ -268,9 +351,41 @@ export function NotasList() {
             </form>
           </CardContent>
         </Card>
-      )}
+      </div>
+    );
+  }
 
-      {notas.length === 0 && !showForm ? (
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Notas</h2>
+          <p className="text-muted-foreground">
+            {notas.length} {notas.length === 1 ? "nota" : "notas"}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            onClick={loadNotas}
+            variant="outline"
+            size={isMobile ? "icon" : "sm"}
+            title="Actualizar"
+          >
+            <RefreshCw className={cn("h-4 w-4", !isMobile && "mr-2")} />
+            {!isMobile && "Actualizar"}
+          </Button>
+          <Button
+            onClick={() => setShowForm(!showForm)}
+            size={isMobile ? "icon" : "sm"}
+            title="Nueva Nota"
+          >
+            <Plus className={cn("h-4 w-4", !isMobile && "mr-2")} />
+            {!isMobile && "Nueva Nota"}
+          </Button>
+        </div>
+      </div>
+
+      {notas.length === 0 ? (
         <Card>
           <CardContent className="py-12">
             <div className="flex flex-col items-center justify-center space-y-4">

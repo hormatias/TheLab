@@ -54,6 +54,7 @@ targets:
         CFBundleShortVersionString: 1.0.0
         CFBundleVersion: "1.0.0"
         NSLocalNetworkUsageDescription: "Esta app necesita acceso a la red local para conectarse al servidor de desarrollo durante el desarrollo."
+        NSMicrophoneUsageDescription: "La app usa el micrófono para grabar notas de voz y transcribirlas a texto."
         NSBonjourServices:
           - "_http._tcp"
     entitlements:

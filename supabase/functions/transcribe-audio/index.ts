@@ -49,7 +49,8 @@ Deno.serve(async (req: Request) => {
     const bytes = base64ToUint8Array(audioBase64);
     const blob = new Blob([bytes], { type: contentType });
     const formData = new FormData();
-    formData.append("file", blob, "audio.webm");
+    const fileExtension = contentType.includes("mp4") ? "audio.m4a" : "audio.webm";
+    formData.append("file", blob, fileExtension);
     formData.append("model", "whisper-1");
 
     const openaiRes = await fetch("https://api.openai.com/v1/audio/transcriptions", {
@@ -71,7 +72,37 @@ Deno.serve(async (req: Request) => {
     const result = await openaiRes.json();
     const text = result?.text ?? "";
 
-    return new Response(JSON.stringify({ text }), {
+    let title = "";
+    if (text.trim()) {
+      try {
+        const chatRes = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${openaiApiKey}`,
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "user",
+                content: `Dado el siguiente texto de una nota, genera un título corto (máximo 5-8 palabras) en el mismo idioma. Responde únicamente con el título, sin comillas ni explicaciones.\n\n${text}`,
+              },
+            ],
+            max_tokens: 50,
+          }),
+        });
+        if (chatRes.ok) {
+          const chatData = await chatRes.json();
+          const raw = chatData?.choices?.[0]?.message?.content?.trim() ?? "";
+          title = raw.replace(/^["']|["']$/g, "").trim();
+        }
+      } catch (e) {
+        console.error("Chat title error:", e);
+      }
+    }
+
+    return new Response(JSON.stringify({ text, title: title ?? "" }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
