@@ -20,6 +20,11 @@ export function AppSidebar() {
 
   const items = [
     {
+      title: "Notas",
+      url: "/notas",
+      icon: StickyNote,
+    },
+    {
       title: "Proyectos",
       url: "/proyectos",
       icon: FolderOpen,
@@ -38,11 +43,6 @@ export function AppSidebar() {
       title: "Cámaras de Andorra",
       url: "/camaras",
       icon: Camera,
-    },
-    {
-      title: "Notas",
-      url: "/notas",
-      icon: StickyNote,
     },
   ]
 
