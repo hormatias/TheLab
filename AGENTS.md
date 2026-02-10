@@ -23,8 +23,6 @@ Cada fila tiene:
 
 Cada entity tiene su `data` como JSONB.
 
-**Nota:** Los campos comunes (`id`, `type`, `created_at`, `updated_at`) 
-
 Estas son las entidades:
 
 ### proyecto
