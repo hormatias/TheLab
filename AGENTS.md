@@ -1,21 +1,24 @@
-# The lab
+# The Lab
 
 ## ¿Qué es?
-Un proyecto de gestión personalizado e impulsado con integraciones de frontera.
+Un proyecto de gestión de laboratorios de código. Personalizado e impulsado con integraciones de frontera.
 
 ## ¿Qué son las entities?
-Las entidades son una unidad de la aplicación (proyectos, clientes, miembros, formularios, cámaras, notas) vive en **una sola tabla** `entities`. Cada fila tiene:
+Las entidades son una unidad de la aplicación (proyectos, clientes, miembros, formularios, cámaras, notas) vive en **una sola tabla** `entities`.
 
+Puedes crear tu propia entity.
+
+Cada fila tiene:
 - **id** (UUID)
 - **type** – tipo de entidad (string)
-- **data** – JSONB con los campos propios de ese tipo
+- **data** – JSONB con los campos propios de ese entity
 - **created_at**, **updated_at**
 
 ## Tipos de entidad y campos de `data` (JSON)
 
-Cada tipo tiene su `data` como JSONB. Estructura por tipo.
+Cada entity tiene su `data` como JSONB. Estructura por entity.
 
-- Una entidad tipo `"proyecto"` tendrá en su `data`:  
+- Una entity `"proyecto"` tendrá en su `data`:  
   `{ "nombre": "...", "descripcion": "...", ... }`
 - Un `"cliente"`:  
   `{ "nombre": "...", "tipo_cliente": "...", "equipo": [...], ... }`
@@ -78,7 +81,7 @@ Estas son las entidades:
 }
 ```
 
-Si `tipo_cliente` es `"particular"`, el cliente no tiene equipo (la UI no muestra ni edita `equipo`; se guarda como `[]`) y sí tiene `descripcion`.
+Si `tipo_cliente` es `"particular"`, el cliente no tiene equipo y sí tiene `descripcion`.
 
 ### miembro
 
