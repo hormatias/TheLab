@@ -1,26 +1,37 @@
-# Guía para agentes: Entities
+# The lab
 
-## Qué son las entities
+## ¿Qué es?
+Un proyecto de gestión personalizado e impulsado con integraciones de frontera.
 
-Todo el dominio (proyectos, clientes, miembros, formularios, cámaras) vive en **una sola tabla** `entities`. Cada fila tiene:
+## ¿Qué son las entities?
+Las entidades son una unidad de la aplicación (proyectos, clientes, miembros, formularios, cámaras, notas) vive en **una sola tabla** `entities`. Cada fila tiene:
 
 - **id** (UUID)
 - **type** – tipo de entidad (string)
 - **data** – JSONB con los campos propios de ese tipo
 - **created_at**, **updated_at**
 
-Así se unificó lo que antes eran varias tablas (proyectos, clientes, miembros, formularios, etc.) en un único modelo flexible.
-
 ## Tipos de entidad y campos de `data` (JSON)
 
-Cada tipo tiene su `data` como JSONB. Estructura por tipo:
+Cada tipo tiene su `data` como JSONB. Estructura por tipo.
+
+- Una entidad tipo `"proyecto"` tendrá en su `data`:  
+  `{ "nombre": "...", "descripcion": "...", ... }`
+- Un `"cliente"`:  
+  `{ "nombre": "...", "tipo_cliente": "...", "equipo": [...], ... }`
+- Un `"miembro"`:  
+  `{ "nombre": "...", "email": "..." }`
+
+**Nota:** Los campos comunes (`id`, `type`, `created_at`, `updated_at`) 
+
+Estas son las entidades:
 
 ### proyecto
 
 ```json
 {
   "nombre": "string",
-  "descripcion": "string | null",
+  "descripcion": "string | null", // Markdown
   "cliente_id": "uuid | null",
   "tareas": [
     {
@@ -56,7 +67,7 @@ Cada tipo tiene su `data` como JSONB. Estructura por tipo:
 {
   "nombre": "string",
   "tipo_cliente": "empresa | particular | null",
-  "descripcion": "string | null",
+  "descripcion": "string | null", // Markdown
   "equipo": [
     {
       "nombre": "string",
@@ -83,7 +94,7 @@ Si `tipo_cliente` es `"particular"`, el cliente no tiene equipo (la UI no muestr
 ```json
 {
   "nombre": "string",
-  "descripcion": "string | null",
+  "descripcion": "string | null", // Markdown
   "pdf_path": "string | null"
 }
 ```
@@ -99,6 +110,24 @@ Si `tipo_cliente` es `"particular"`, el cliente no tiene equipo (la UI no muestr
 }
 ```
 
+### nota
+
+```json
+{
+  "titulo": "string",
+  "contenido": "string | null" // Markdown
+}
+```
+
+## Editores de Markdown
+
+En las pantallas donde se editan campos en Markdown se usa el patrón **vista → Editar → edición**:
+
+- **Por defecto:** modo vista (solo lectura). El contenido se muestra renderizado con `react-markdown`; no se duplica editor y vista previa.
+- **Botón "Editar":** pasa al modo edición (textarea con el Markdown en crudo). Guardar persiste y vuelve a vista; Cancelar descarta y vuelve a vista.
+
+Referencia: `nota-detail.jsx` (estado `isEditing`, botón Editar).
+
 ## Cómo se usan en código
 
 - **Hook:** `useEntities(tipo)` → devuelve `list`, `get`, `create`, `update`, `remove`, `search`, `subscribe`.
@@ -106,3 +135,4 @@ Si `tipo_cliente` es `"particular"`, el cliente no tiene equipo (la UI no muestr
 - Para relaciones: `getEntityById(type, id)` y `getEntitiesByIds(type, ids)` en `use-entities.js`.
 
 No hay tablas separadas por tipo; todo es `entities` filtrado por `type`.
+
