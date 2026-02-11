@@ -4,6 +4,7 @@ import { useEntities, getEntitiesByIds } from "@/hooks/use-entities";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PercentageSlider } from "@/components/ui/percentage-slider";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Loader2, AlertCircle, ArrowLeft, User, Users, Eye, Edit2, Save, X, UserPlus, UserMinus, CheckSquare, Square, Plus, Trash2, ListTodo, Building2, Sparkles, Calendar, GanttChart, List, DollarSign, Lock, Unlock, FileDown, Mic } from "lucide-react";
 import { useVerticalViewport } from "@/hooks/use-vertical-viewport";
 import { cn } from "@/lib/utils";
@@ -70,7 +71,6 @@ export function ProyectoDetail() {
   const [frecuenciaRecurrencia, setFrecuenciaRecurrencia] = useState("mensual");
   const [numeroCuotas, setNumeroCuotas] = useState("");
   const [fechasCobroPersonalizadas, setFechasCobroPersonalizadas] = useState([]);
-  const [personalizandoFechas, setPersonalizandoFechas] = useState(false);
   const [savingPresupuesto, setSavingPresupuesto] = useState(false);
   const [fechaInicioPrimerPago, setFechaInicioPrimerPago] = useState("");
 
@@ -157,12 +157,6 @@ export function ProyectoDetail() {
       setFrecuenciaRecurrencia(data.frecuencia_recurrencia || "mensual");
       setNumeroCuotas(data.numero_cuotas?.toString() || "");
       setFechasCobroPersonalizadas(data.fechas_cobro_personalizadas || []);
-      // Solo activar personalización si la frecuencia es "personalizado"
-      setPersonalizandoFechas(
-        data.frecuencia_recurrencia === "personalizado" 
-        && data.fechas_cobro_personalizadas 
-        && data.fechas_cobro_personalizadas.length > 0
-      );
       setTareas(data.tareas || []);
       
       // Cargar fecha de inicio del primer pago, o usar la fecha de inicio del proyecto si existe
@@ -646,8 +640,7 @@ CRÍTICO - JSON válido: Responde ÚNICAMENTE con el objeto JSON completo (solo 
       const cuotasPersonalizadas = cuotasNum || fechasCobroPersonalizadas.length || 0;
       const tienePresupuesto = presupuestoNum !== null && !Number.isNaN(presupuestoNum);
       const totalBase = obtenerTotalBase(presupuestoNum || 0, cuotasPersonalizadas, tipoPresupuesto);
-      const fechasPersonalizadas = frecuenciaRecurrencia === "personalizado"
-        && personalizandoFechas
+      const fechasPersonalizadas = (tipoPresupuesto === "recurrente" || tipoPresupuesto === "fraccionado")
         && fechasCobroPersonalizadas.length > 0
         && tienePresupuesto
         && cuotasPersonalizadas
@@ -691,6 +684,20 @@ CRÍTICO - JSON válido: Responde ÚNICAMENTE con el objeto JSON completo (solo 
     }
   }
 
+  function abrirEdicionPresupuesto() {
+    setEditingPresupuesto(true);
+    // Poblar cuotas la primera vez al abrir edición (si hay recurrente/fraccionado con datos)
+    if ((tipoPresupuesto === "recurrente" || tipoPresupuesto === "fraccionado") && numeroCuotas && presupuestoValue) {
+      const cuotasActuales = parseInt(numeroCuotas) || 0;
+      if (cuotasActuales > 0 && fechasCobroPersonalizadas.length === 0) {
+        const fechas = generarFechasAutomaticas();
+        if (fechas.length > 0) {
+          setFechasCobroPersonalizadas(fechas);
+        }
+      }
+    }
+  }
+
   function handleCancelEditPresupuesto() {
     setPresupuestoValue(proyecto?.presupuesto?.toString() || "");
     setMonedaValue(proyecto?.moneda || "EUR");
@@ -698,12 +705,6 @@ CRÍTICO - JSON válido: Responde ÚNICAMENTE con el objeto JSON completo (solo 
     setFrecuenciaRecurrencia(proyecto?.frecuencia_recurrencia || "mensual");
     setNumeroCuotas(proyecto?.numero_cuotas?.toString() || "");
     setFechasCobroPersonalizadas(proyecto?.fechas_cobro_personalizadas || []);
-    // Solo activar personalización si la frecuencia es "personalizado"
-    setPersonalizandoFechas(
-      proyecto?.frecuencia_recurrencia === "personalizado"
-      && proyecto?.fechas_cobro_personalizadas
-      && proyecto.fechas_cobro_personalizadas.length > 0
-    );
     // Restaurar fecha de inicio del primer pago
     const tareasData = proyecto?.tareas || [];
     const fechaInicioProyecto = tareasData.length > 0
@@ -867,7 +868,7 @@ CRÍTICO - JSON válido: Responde ÚNICAMENTE con el objeto JSON completo (solo 
       }
     }
 
-    if (!fechaInicio) return [];
+    if (!fechaInicio) fechaInicio = new Date();
 
     const fechas = [];
     let fechaActual = new Date(fechaInicio);
@@ -882,6 +883,8 @@ CRÍTICO - JSON válido: Responde ÚNICAMENTE con el objeto JSON completo (solo 
       // Incrementar según frecuencia (personalizado usa mensual como base)
       if (frecuenciaRecurrencia === "anual") {
         fechaActual.setFullYear(fechaActual.getFullYear() + 1);
+      } else if (frecuenciaRecurrencia === "trimestral") {
+        fechaActual.setMonth(fechaActual.getMonth() + 3);
       } else {
         // mensual y personalizado: incremento mensual
         fechaActual.setMonth(fechaActual.getMonth() + 1);
@@ -898,49 +901,53 @@ CRÍTICO - JSON válido: Responde ÚNICAMENTE con el objeto JSON completo (solo 
     return fechas;
   }
 
-  // Efecto para actualizar fechas cuando cambian parámetros y está en modo personalización
+  // Efecto: auto-calcular cuotas cuando hay recurrente/fraccionado con presupuesto y cuotas
   useEffect(() => {
-    if (!editingPresupuesto) return; // Solo cuando está editando presupuesto
-    
-    if (personalizandoFechas && (tipoPresupuesto === "recurrente" || tipoPresupuesto === "fraccionado") && numeroCuotas && presupuestoValue !== "") {
-      const cuotasActuales = parseInt(numeroCuotas) || 0;
-      const fechasActuales = fechasCobroPersonalizadas.length;
-      const presupuestoNum = parseFloat(presupuestoValue) || 0;
-      const totalBase = obtenerTotalBase(presupuestoNum, cuotasActuales, tipoPresupuesto);
-      
-      // Si cambió el número de cuotas, regenerar fechas
-      if (cuotasActuales !== fechasActuales && cuotasActuales > 0) {
-        const nuevasFechas = generarFechasAutomaticas();
-        if (nuevasFechas.length > 0) {
-          setFechasCobroPersonalizadas(nuevasFechas);
-        }
-      } else if (fechasActuales > 0 && fechasActuales === cuotasActuales) {
-        // Actualizar montos/porcentajes si cambió el presupuesto o tipo (mantener fechas)
-        const porcentajes = obtenerPorcentajesActuales(
-          fechasCobroPersonalizadas,
-          totalBase,
-          cuotasActuales
-        );
-        
-        const fechasActualizadas = fechasCobroPersonalizadas.map((cobro, index) => ({
-          ...cobro,
-          porcentaje: porcentajes[index],
-          monto: totalBase ? (totalBase * porcentajes[index]) / 100 : 0,
+    if (!editingPresupuesto) return;
+    if ((tipoPresupuesto !== "recurrente" && tipoPresupuesto !== "fraccionado") || !numeroCuotas || presupuestoValue === "") return;
+
+    const cuotasActuales = parseInt(numeroCuotas) || 0;
+    const fechasActuales = fechasCobroPersonalizadas.length;
+    const presupuestoNum = parseFloat(presupuestoValue) || 0;
+    const totalBase = obtenerTotalBase(presupuestoNum, cuotasActuales, tipoPresupuesto);
+
+    if (cuotasActuales !== fechasActuales && cuotasActuales > 0) {
+      const nuevasFechas = generarFechasAutomaticas();
+      if (nuevasFechas.length > 0) {
+        setFechasCobroPersonalizadas(nuevasFechas);
+      }
+    } else if (frecuenciaRecurrencia !== "personalizado" && cuotasActuales > 0) {
+      // Para mensual/trimestral/anual, recalcular fechas desde fecha inicio (preservar % si ya hay datos)
+      const nuevasFechas = generarFechasAutomaticas();
+      if (nuevasFechas.length > 0 && fechasActuales === cuotasActuales) {
+        const porcentajes = obtenerPorcentajesActuales(fechasCobroPersonalizadas, totalBase, cuotasActuales);
+        const merged = nuevasFechas.map((f, i) => ({
+          ...f,
+          porcentaje: porcentajes[i] ?? f.porcentaje,
+          monto: totalBase ? (totalBase * (porcentajes[i] ?? f.porcentaje)) / 100 : 0,
           moneda: monedaValue || "EUR"
         }));
-        setFechasCobroPersonalizadas(fechasActualizadas);
+        setFechasCobroPersonalizadas(merged);
+      } else if (nuevasFechas.length > 0) {
+        setFechasCobroPersonalizadas(nuevasFechas);
       }
+    } else if (fechasActuales > 0 && fechasActuales === cuotasActuales && frecuenciaRecurrencia === "personalizado") {
+      // Solo actualizar montos/porcentajes cuando es personalizado (preservar fechas editadas)
+      const porcentajes = obtenerPorcentajesActuales(
+        fechasCobroPersonalizadas,
+        totalBase,
+        cuotasActuales
+      );
+      const fechasActualizadas = fechasCobroPersonalizadas.map((cobro, index) => ({
+        ...cobro,
+        porcentaje: porcentajes[index],
+        monto: totalBase ? (totalBase * porcentajes[index]) / 100 : 0,
+        moneda: monedaValue || "EUR"
+      }));
+      setFechasCobroPersonalizadas(fechasActualizadas);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tipoPresupuesto, numeroCuotas, presupuestoValue, frecuenciaRecurrencia, monedaValue, personalizandoFechas, editingPresupuesto]);
-
-  // Efecto para desactivar personalización si cambia la frecuencia a algo que no sea "personalizado"
-  useEffect(() => {
-    if (editingPresupuesto && frecuenciaRecurrencia !== "personalizado" && personalizandoFechas) {
-      setPersonalizandoFechas(false);
-      setFechasCobroPersonalizadas([]);
-    }
-  }, [frecuenciaRecurrencia, editingPresupuesto, personalizandoFechas]);
+  }, [tipoPresupuesto, numeroCuotas, presupuestoValue, frecuenciaRecurrencia, monedaValue, fechaInicioPrimerPago, editingPresupuesto]);
 
   const porcentajesCobro = useMemo(() => {
     const cuotasActuales = parseInt(numeroCuotas) || fechasCobroPersonalizadas.length || 0;
@@ -1040,13 +1047,6 @@ CRÍTICO - JSON válido: Responde ÚNICAMENTE con el objeto JSON completo (solo 
       // Redistribuir porcentajes como si se hubiera ajustado el porcentaje
       actualizarPorcentajeCobro(index, Math.min(100, nuevoPorcentaje));
     }
-  }
-
-  // Restablecer fechas automáticas
-  function restablecerFechasAutomaticas() {
-    const fechasAuto = generarFechasAutomaticas();
-    setFechasCobroPersonalizadas(fechasAuto);
-    setPersonalizandoFechas(true);
   }
 
   // Función auxiliar para guardar tareas en el proyecto
@@ -1343,7 +1343,7 @@ Responde SOLO con el JSON array, sin explicaciones adicionales.`;
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setEditingPresupuesto(true)}
+                onClick={abrirEdicionPresupuesto}
                 title="Editar presupuesto"
               >
                 <Edit2 className={cn("h-4 w-4", !isMobile && "mr-2")} />
@@ -1395,38 +1395,35 @@ Responde SOLO con el JSON array, sin explicaciones adicionales.`;
                 </div>
               </div>
               <div>
-                <label htmlFor="tipo_presupuesto" className="text-sm font-medium">
-                  Tipo de Presupuesto
-                </label>
-                <select
-                  id="tipo_presupuesto"
+                <label className="text-sm font-medium block mb-2">Tipo de Presupuesto</label>
+                <SegmentedControl
+                  options={[
+                    { value: "unico", label: "Único" },
+                    { value: "recurrente", label: "Recurrente" },
+                    { value: "fraccionado", label: "Fraccionado" }
+                  ]}
                   value={tipoPresupuesto}
-                  onChange={(e) => setTipoPresupuesto(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  onChange={setTipoPresupuesto}
                   disabled={savingPresupuesto}
-                >
-                  <option value="unico">Único (pago único)</option>
-                  <option value="recurrente">Recurrente (pagos periódicos)</option>
-                  <option value="fraccionado">Fraccionado (pago total en cuotas)</option>
-                </select>
+                  className="w-full"
+                />
               </div>
               {(tipoPresupuesto === "recurrente" || tipoPresupuesto === "fraccionado") && (
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
-                    <label htmlFor="frecuencia" className="text-sm font-medium">
-                      Frecuencia
-                    </label>
-                    <select
-                      id="frecuencia"
+                    <label className="text-sm font-medium block mb-2">Frecuencia</label>
+                    <SegmentedControl
+                      options={[
+                        { value: "mensual", label: "Mensual" },
+                        { value: "trimestral", label: "Trimestral" },
+                        { value: "anual", label: "Anual" },
+                        { value: "personalizado", label: "Personalizado" }
+                      ]}
                       value={frecuenciaRecurrencia}
-                      onChange={(e) => setFrecuenciaRecurrencia(e.target.value)}
-                      className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      onChange={setFrecuenciaRecurrencia}
                       disabled={savingPresupuesto}
-                    >
-                      <option value="mensual">Mensual</option>
-                      <option value="anual">Anual</option>
-                      <option value="personalizado">Personalizado</option>
-                    </select>
+                      className="w-full"
+                    />
                   </div>
                   <div>
                     <label htmlFor="cuotas" className="text-sm font-medium">
@@ -1452,65 +1449,25 @@ Responde SOLO con el JSON array, sin explicaciones adicionales.`;
               )}
               {(tipoPresupuesto === "recurrente" || tipoPresupuesto === "fraccionado") && numeroCuotas && (
                 <div className="space-y-3">
-                  {frecuenciaRecurrencia === "personalizado" ? (
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm font-medium">Fechas de Pago</label>
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={restablecerFechasAutomaticas}
-                          disabled={savingPresupuesto || !presupuestoValue || !numeroCuotas}
-                          className="text-xs"
-                        >
-                          Calcular automáticamente
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={personalizandoFechas ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => {
-                            if (!personalizandoFechas) {
-                              const fechasAuto = generarFechasAutomaticas();
-                              setFechasCobroPersonalizadas(fechasAuto);
-                            }
-                            setPersonalizandoFechas(!personalizandoFechas);
-                          }}
-                          disabled={savingPresupuesto || !presupuestoValue || !numeroCuotas}
-                          className="text-xs"
-                        >
-                          {personalizandoFechas ? "Usar automáticas" : "Personalizar fechas"}
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-sm font-medium">Fechas de Pago</label>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Las fechas se calcularán automáticamente según la frecuencia seleccionada.
-                        </p>
-                      </div>
-                      <div>
-                        <label htmlFor="fecha_inicio_primer_pago" className="text-sm font-medium">
-                          Fecha de inicio del primer pago
-                        </label>
-                        <input
-                          id="fecha_inicio_primer_pago"
-                          type="date"
-                          value={fechaInicioPrimerPago || ""}
-                          onChange={(e) => setFechaInicioPrimerPago(e.target.value)}
-                          className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                          disabled={savingPresupuesto}
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Fecha desde la cual se calcularán los pagos periódicos.
-                        </p>
-                      </div>
+                  {frecuenciaRecurrencia !== "personalizado" && (
+                    <div>
+                      <label htmlFor="fecha_inicio_primer_pago" className="text-sm font-medium">
+                        Fecha de inicio del primer pago
+                      </label>
+                      <input
+                        id="fecha_inicio_primer_pago"
+                        type="date"
+                        value={fechaInicioPrimerPago || ""}
+                        onChange={(e) => setFechaInicioPrimerPago(e.target.value)}
+                        className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        disabled={savingPresupuesto}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Fecha desde la cual se calcularán los pagos periódicos.
+                      </p>
                     </div>
                   )}
-                  {frecuenciaRecurrencia === "personalizado" && personalizandoFechas && fechasCobroPersonalizadas.length > 0 && (
+                  {fechasCobroPersonalizadas.length > 0 && (
                     <div className="space-y-2 max-h-60 overflow-y-auto border rounded-md p-3">
                       {fechasCobroPersonalizadas.map((cobro, index) => {
                         const estaFijado = cobro.fijado === true;
@@ -1694,7 +1651,7 @@ Responde SOLO con el JSON array, sin explicaciones adicionales.`;
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setEditingPresupuesto(true)}
+                onClick={abrirEdicionPresupuesto}
               >
                 <Edit2 className="h-4 w-4 mr-2" />
                 Agregar presupuesto
