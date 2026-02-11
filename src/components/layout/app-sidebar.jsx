@@ -34,7 +34,7 @@ export function AppSidebar() {
       icon: DollarSign,
     },
     {
-      title: "Formularios",
+      title: "Tempus",
       url: "/formularios",
       icon: FileText,
     },

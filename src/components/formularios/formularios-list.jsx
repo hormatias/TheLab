@@ -205,7 +205,7 @@ export function FormulariosList() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Formularios</h2>
+          <h2 className="text-3xl font-bold tracking-tight">Tempus</h2>
           <p className="text-muted-foreground">
             {formularios.length} {formularios.length === 1 ? "formulario" : "formularios"}
           </p>

@@ -15,7 +15,7 @@ const getPageTitle = (pathname) => {
     return "Miembros";
   }
   if (pathname.startsWith("/formularios")) {
-    return "Formularios";
+    return "Tempus";
   }
   if (pathname.startsWith("/contabilidad")) {
     return "Contabilidad";
@@ -85,10 +85,10 @@ export function Header() {
           if (data) {
             setPageTitle(data.nombre);
           } else {
-            setPageTitle("Formularios");
+            setPageTitle("Tempus");
           }
         } catch (err) {
-          setPageTitle("Formularios");
+          setPageTitle("Tempus");
         }
       } else if (instruccionMatch) {
         const id = instruccionMatch[1];
