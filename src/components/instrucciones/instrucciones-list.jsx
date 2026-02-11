@@ -3,10 +3,61 @@ import { useNavigate } from "react-router-dom";
 import { useEntities } from "@/hooks/use-entities";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { StickyNote, Loader2, AlertCircle, Plus, Trash2, RefreshCw, Mic, Square, Clock } from "lucide-react";
+import { StickyNote, Loader2, AlertCircle, Plus, Trash2, Mic, Square, Clock } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useVerticalViewport } from "@/hooks/use-vertical-viewport";
 import { cn } from "@/lib/utils";
+
+/** Fecha local como YYYY-MM-DD para comparar solo día. */
+function toDateKey(d) {
+  const y = d.getFullYear(), m = d.getMonth(), day = d.getDate();
+  return `${y}-${String(m + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/** Lunes 00:00:00 de la semana de la fecha dada (semana lun–dom). */
+function getStartOfWeek(d) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  const day = x.getDay();
+  const diff = day === 0 ? 6 : day - 1;
+  x.setDate(x.getDate() - diff);
+  return x;
+}
+
+/**
+ * Agrupa instrucciones por franjas temporales (hoy, ayer, esta semana, este mes, anteriores).
+ * Usa fecha local y updated_at (o created_at). La lista debe venir ordenada por updated_at desc.
+ */
+function groupInstruccionesByDate(instrucciones) {
+  const now = new Date();
+  const todayKey = toDateKey(now);
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayKey = toDateKey(yesterday);
+  const startOfWeekKey = toDateKey(getStartOfWeek(now));
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfMonthKey = toDateKey(startOfMonth);
+
+  const groups = { hoy: [], ayer: [], estaSemana: [], esteMes: [], anteriores: [] };
+  for (const inst of instrucciones) {
+    const date = new Date(inst.updated_at || inst.created_at || 0);
+    const key = toDateKey(date);
+    if (key === todayKey) groups.hoy.push(inst);
+    else if (key === yesterdayKey) groups.ayer.push(inst);
+    else if (key >= startOfWeekKey && key < todayKey) groups.estaSemana.push(inst);
+    else if (key >= startOfMonthKey && key < startOfWeekKey) groups.esteMes.push(inst);
+    else groups.anteriores.push(inst);
+  }
+  return groups;
+}
+
+const SECTION_LABELS = [
+  { key: "hoy", label: "Hoy" },
+  { key: "ayer", label: "Ayer" },
+  { key: "estaSemana", label: "Esta semana" },
+  { key: "esteMes", label: "Este mes" },
+  { key: "anteriores", label: "Anteriores" },
+];
 
 export function InstruccionesList() {
   const navigate = useNavigate();
@@ -25,6 +76,9 @@ export function InstruccionesList() {
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
   const userClosedFormRef = useRef(false);
+  const pullStartRef = useRef({ y: 0, scrollY: 0 });
+  /** "form" = rellenar título/descripcion; "newNote" = crear instrucción tras transcribir */
+  const recordingIntentRef = useRef("form");
 
   const instruccionesApi = useEntities("instruccion");
 
@@ -32,11 +86,28 @@ export function InstruccionesList() {
     loadInstrucciones();
   }, []);
 
+  // Pull-to-refresh: al soltar tras arrastrar hacia abajo desde el top, recargar
   useEffect(() => {
-    if (!loading && instrucciones.length === 0 && !showForm && !userClosedFormRef.current) {
-      setShowForm(true);
+    const PULL_THRESHOLD = 80;
+    function onTouchStart(e) {
+      if (e.touches.length === 0) return;
+      pullStartRef.current = { y: e.touches[0].clientY, scrollY: window.scrollY };
     }
-  }, [loading, instrucciones.length, showForm]);
+    function onTouchEnd(e) {
+      if (e.changedTouches.length === 0) return;
+      const { y: startY, scrollY: startScrollY } = pullStartRef.current;
+      const endY = e.changedTouches[0].clientY;
+      if (startScrollY === 0 && startY - endY >= PULL_THRESHOLD) {
+        loadInstrucciones();
+      }
+    }
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchend", onTouchEnd, { passive: true });
+    return () => {
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchend", onTouchEnd);
+    };
+  }, []);
 
   async function loadInstrucciones() {
     try {
@@ -136,12 +207,32 @@ export function InstruccionesList() {
           }
           const data = await response.json();
           const text = data?.text ?? "";
-          if (text) {
-            setDescripcion((prev) => (prev ? prev + "\n\n" + text : text));
-            const suggestedTitle = data?.title?.trim();
-            if (suggestedTitle) setTitulo((prev) => (prev.trim() ? prev : suggestedTitle));
+          const suggestedTitle = data?.title?.trim();
+          const intent = recordingIntentRef.current;
+
+          if (intent === "newNote") {
+            try {
+              const { data: newInst } = await instruccionesApi.create({
+                titulo: suggestedTitle || "Nota de voz",
+                descripcion: text || null,
+              });
+              setInstrucciones((prev) =>
+                [newInst, ...prev].sort(
+                  (a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0)
+                )
+              );
+            } catch (createErr) {
+              console.error("Error al crear instrucción:", createErr);
+              alert(`Error al crear la nota: ${createErr.message}`);
+            }
+            recordingIntentRef.current = "form";
+          } else {
+            if (text) {
+              setDescripcion((prev) => (prev ? prev + "\n\n" + text : text));
+              if (suggestedTitle) setTitulo((prev) => (prev.trim() ? prev : suggestedTitle));
+            }
+            if (!text && data?.error) throw new Error(data.error);
           }
-          if (!text && data?.error) throw new Error(data.error);
         } catch (err) {
           console.error("Error al transcribir:", err);
           alert(`Error al transcribir: ${err.message}`);
@@ -285,7 +376,13 @@ export function InstruccionesList() {
                     variant="outline"
                     size="icon"
                     className="h-8 w-8 shrink-0"
-                    onClick={() => (recording ? stopRecording() : startRecording())}
+                    onClick={() => {
+                      if (recording) stopRecording();
+                      else {
+                        recordingIntentRef.current = "form";
+                        startRecording();
+                      }
+                    }}
                     disabled={creating || transcribing}
                     title={recording ? "Parar grabación" : transcribing ? "Transcribiendo..." : "Grabar con voz"}
                     aria-label={recording ? "Parar grabación" : "Grabar con voz"}
@@ -352,33 +449,105 @@ userClosedFormRef.current = true;
     );
   }
 
+  const groups = groupInstruccionesByDate(instrucciones);
+
+  function renderInstructionCard(instruccion) {
+    return (
+      <Card
+        key={instruccion.id}
+        className="hover:shadow-md transition-shadow cursor-pointer"
+        onClick={() => navigate(`/instrucciones/${instruccion.id}`)}
+      >
+        <CardHeader>
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 pr-2 min-w-0">
+              <CardTitle className="line-clamp-1">
+                {instruccion.titulo || "Sin título"}
+              </CardTitle>
+              <CardDescription className="mt-1 line-clamp-2">
+                {preview(instruccion.descripcion ?? instruccion.contenido)}
+              </CardDescription>
+              {(instruccion.updated_at || instruccion.created_at) && (
+                <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  {new Date(instruccion.updated_at || instruccion.created_at).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                </p>
+              )}
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-destructive hover:text-destructive shrink-0"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleDeleteClick(instruccion.id, instruccion.titulo);
+              }}
+              disabled={deleting === instruccion.id}
+              aria-label="Eliminar instrucción"
+            >
+              {deleting === instruccion.id ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        </CardHeader>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Instrucciones</h2>
-          <p className="text-muted-foreground">
-            {instrucciones.length} {instrucciones.length === 1 ? "instrucción" : "instrucciones"}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            onClick={loadInstrucciones}
-            variant="outline"
-            size={isMobile ? "icon" : "sm"}
-            title="Actualizar"
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="flex gap-4 min-h-[140px] w-full md:col-span-2 lg:col-span-3 md:justify-center">
+          <Card
+            className="flex-1 hover:shadow-md transition-shadow cursor-pointer flex flex-col justify-center items-center p-4 min-h-[120px]"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowForm(true);
+            }}
           >
-            <RefreshCw className={cn("h-4 w-4", !isMobile && "mr-2")} />
-            {!isMobile && "Actualizar"}
-          </Button>
-          <Button
-            onClick={() => setShowForm(!showForm)}
-            size={isMobile ? "icon" : "sm"}
-            title="Nueva Instrucción"
+            <Plus className="h-8 w-8 text-muted-foreground mb-1.5" aria-hidden />
+            <span className="text-sm font-medium">Escribir</span>
+          </Card>
+          <Card
+            className={cn(
+              "flex-1 transition-shadow flex flex-col justify-center items-center p-4 min-h-[120px]",
+              recording || transcribing ? "bg-muted/50" : "hover:shadow-md cursor-pointer",
+              transcribing && "pointer-events-none"
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (recording) {
+                stopRecording();
+                return;
+              }
+              if (transcribing) return;
+              recordingIntentRef.current = "newNote";
+              startRecording();
+            }}
+            aria-disabled={transcribing}
           >
-            <Plus className={cn("h-4 w-4", !isMobile && "mr-2")} />
-            {!isMobile && "Nueva Instrucción"}
-          </Button>
+            {transcribing ? (
+              <>
+                <Loader2 className="h-8 w-8 text-muted-foreground mb-1.5 animate-spin" aria-hidden />
+                <span className="text-sm font-medium">Transcribiendo…</span>
+              </>
+            ) : recording ? (
+              <>
+                <Square className="h-8 w-8 text-muted-foreground mb-1.5" aria-hidden />
+                <span className="text-sm font-medium">Toca para parar</span>
+              </>
+            ) : (
+              <>
+                <Mic className="h-8 w-8 text-muted-foreground mb-1.5" aria-hidden />
+                <span className="text-sm font-medium">Grabar nota</span>
+              </>
+            )}
+          </Card>
         </div>
       </div>
 
@@ -396,55 +565,26 @@ userClosedFormRef.current = true;
             </div>
           </CardContent>
         </Card>
-      ) : instrucciones.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {instrucciones.map((instruccion) => (
-            <Card
-              key={instruccion.id}
-              className="hover:shadow-md transition-shadow cursor-pointer"
-              onClick={() => navigate(`/instrucciones/${instruccion.id}`)}
-            >
-              <CardHeader>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 pr-2 min-w-0">
-                    <CardTitle className="line-clamp-1">
-                      {instruccion.titulo || "Sin título"}
-                    </CardTitle>
-                    <CardDescription className="mt-1 line-clamp-2">
-                      {preview(instruccion.descripcion ?? instruccion.contenido)}
-                    </CardDescription>
-                    {(instruccion.updated_at || instruccion.created_at) && (
-                      <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1.5">
-                        <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                        {new Date(instruccion.updated_at || instruccion.created_at).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                      </p>
-                    )}
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive hover:text-destructive shrink-0"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleDeleteClick(instruccion.id, instruccion.titulo);
-                    }}
-                    disabled={deleting === instruccion.id}
-                    aria-label="Eliminar instrucción"
-                  >
-                    {deleting === instruccion.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                  </Button>
+      ) : (
+        <div className="space-y-8">
+          {SECTION_LABELS.map(({ key, label }) => {
+            const list = groups[key];
+            if (!list || list.length === 0) return null;
+            const n = list.length;
+            const text = n === 1 ? "1 instrucción" : `${n} instrucciones`;
+            return (
+              <section key={key}>
+                <h3 className="text-sm font-medium text-muted-foreground mb-3">
+                  {label} — {text}
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {list.map((instruccion) => renderInstructionCard(instruccion))}
                 </div>
-              </CardHeader>
-            </Card>
-          ))}
+              </section>
+            );
+          })}
         </div>
-      ) : null}
+      )}
 
       <ConfirmDialog
         open={!!confirmDelete}
