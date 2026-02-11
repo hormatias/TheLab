@@ -208,7 +208,7 @@ const sidebarMenuButtonVariants = cva(
     variants: {
       variant: {
         default: "",
-        active: "bg-accent text-accent-foreground",
+        active: "bg-primary/10 text-primary",
       },
     },
     defaultVariants: {

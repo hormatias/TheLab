@@ -8,7 +8,6 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { cn } from "@/lib/utils"
@@ -67,15 +66,16 @@ export function AppSidebar() {
                 const isActive = location.pathname.startsWith(item.url)
                 return (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      variant={isActive ? "active" : "default"}
+                    <Link
+                      to={item.url}
+                      className={cn(
+                        "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0",
+                        isActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+                      )}
                     >
-                      <Link to={item.url}>
-                        <item.icon />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </Link>
                   </SidebarMenuItem>
                 )
               })}
