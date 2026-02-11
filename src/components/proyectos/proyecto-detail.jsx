@@ -12,6 +12,19 @@ import remarkGfm from "remark-gfm";
 import { queryDeepSeek } from "@/lib/deepseek";
 import { TareasTimeline } from "@/components/ui/tareas-timeline";
 
+/** Contexto del sistema (AGENTS.md) para el prompt de aplicar instrucción al proyecto. */
+const AGENTS_CONTEXT = `# The Lab
+Proyecto de gestión de laboratorios de código. Los datos viven en Supabase; las entidades son una unidad básica (proyectos, clientes, miembros, formularios, cámaras, instrucciones) en tabla \`entities\` con \`type\`, \`data\` (JSONB), etc. Se usa jsonb y markdown para integrabilidad.
+
+## Entidad proyecto – campos de data (JSON)
+- nombre (string), descripcion (string | null, Markdown), cliente_id (uuid | null)
+- tareas: array de { id (uuid), nombre, completada, fecha_inicio (YYYY-MM-DD | null), fecha_fin (YYYY-MM-DD | null), created_at }
+- presupuesto (number | null), moneda (string, ej. EUR), tipo_presupuesto: unico | recurrente | fraccionado
+- frecuencia_recurrencia: mensual | trimestral | anual | personalizado | null, numero_cuotas (number | null), fecha_inicio_primer_pago (YYYY-MM-DD | null)
+- fechas_cobro_personalizadas: array de { fecha, monto, porcentaje, moneda }, miembro_ids: array de uuid
+
+La descripción se edita y muestra como Markdown (react-markdown); conviene usar encabezados, listas, negrita, enlaces.`;
+
 export function ProyectoDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -26,6 +39,7 @@ export function ProyectoDetail() {
   const [transcribingDescripcion, setTranscribingDescripcion] = useState(false);
   const mediaRecorderDescRef = useRef(null);
   const streamDescRef = useRef(null);
+  const editingDescripcionRef = useRef("");
   const [miembros, setMiembros] = useState([]);
   const [todosLosMiembros, setTodosLosMiembros] = useState([]);
   const [showAddMember, setShowAddMember] = useState(false);
@@ -69,6 +83,8 @@ export function ProyectoDetail() {
   const [instrucciones, setInstrucciones] = useState([]);
   const [selectedInstruccionId, setSelectedInstruccionId] = useState("");
   const [importingInstruccion, setImportingInstruccion] = useState(false);
+  const [showDeleteInstruccionDialog, setShowDeleteInstruccionDialog] = useState(false);
+  const [appliedInstruccion, setAppliedInstruccion] = useState(null);
 
   useEffect(() => {
     loadProyecto();
@@ -89,6 +105,10 @@ export function ProyectoDetail() {
   useEffect(() => {
     localStorage.setItem('tareas-vista-timeline', vistaTimeline.toString());
   }, [vistaTimeline]);
+
+  useEffect(() => {
+    editingDescripcionRef.current = editingDescripcion;
+  }, [editingDescripcion]);
 
   async function loadProyecto() {
     try {
@@ -345,14 +365,26 @@ export function ProyectoDetail() {
             throw new Error(errData.error || `Error ${response.status}`);
           }
           const data = await response.json();
-          const text = data?.text ?? "";
-          if (text) {
-            setEditingDescripcion((prev) => (prev ? prev.trim() + "\n\n" + text : text));
-          }
+          const text = data?.text?.trim() ?? "";
           if (!text && data?.error) throw new Error(data.error);
+          if (text) {
+            const currentDesc = editingDescripcionRef.current?.trim() ?? "";
+            const systemPrompt = `Eres un asistente que combina texto. Recibes la descripción actual de un proyecto (Markdown) y un nuevo texto transcrito de voz. Tu tarea: integrar el nuevo contenido con la descripción existente en una sola descripción coherente en Markdown. No concatenes al final; integra las ideas (reordena, une párrafos, mantén encabezados y listas). Conserva el contenido existente salvo que el nuevo lo aclare o reemplace. Responde ÚNICAMENTE con la descripción combinada en Markdown, sin explicaciones ni pasos de razonamiento.`;
+            const userMessage = currentDesc
+              ? `Descripción actual:\n\n${currentDesc}\n\n---\n\nNuevo texto (voz):\n\n${text}\n\n---\n\nDevuelve solo la descripción combinada en Markdown.`
+              : `Texto transcrito de voz (convertir a descripción en Markdown):\n\n${text}\n\n---\n\nDevuelve solo la descripción en Markdown.`;
+            const combined = await queryDeepSeek(systemPrompt, userMessage, {
+              model: "deepseek-reasoner",
+              max_tokens: 4096,
+            });
+            let combinedTrimmed = combined.trim();
+            const codeBlockMatch = combinedTrimmed.match(/```(?:markdown)?\s*([\s\S]*?)```/);
+            if (codeBlockMatch) combinedTrimmed = codeBlockMatch[1].trim();
+            setEditingDescripcion(combinedTrimmed || (currentDesc ? currentDesc + "\n\n" + text : text));
+          }
         } catch (err) {
-          console.error("Error al transcribir:", err);
-          alert(`Error al transcribir: ${err.message}`);
+          console.error("Error al transcribir o combinar:", err);
+          alert(`Error: ${err.message}`);
         } finally {
           setTranscribingDescripcion(false);
           setRecordingDescripcion(false);
@@ -363,9 +395,9 @@ export function ProyectoDetail() {
     } catch (err) {
       console.error("Error al acceder al micrófono:", err);
       if (err.name === "NotAllowedError") {
-        alert("Se ha denegado el acceso al micrófono. Permite el permiso para grabar.");
+        alert("Se ha denegado el acceso al micrófono. Permite el permiso para usar el micrófono.");
       } else {
-        alert(`Error al grabar: ${err.message}`);
+        alert(`Error al usar el micrófono: ${err.message}`);
       }
     }
   }
@@ -392,16 +424,90 @@ export function ProyectoDetail() {
     return data;
   }
 
-  /** Extrae JSON del texto de respuesta (quita bloques ```json ... ``` si existen). */
+  /** Extrae el objeto JSON raíz (por profundidad de llaves para no cortar en } dentro de strings). */
+  function extractRootJson(str) {
+    const start = str.indexOf("{");
+    if (start === -1) return str;
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    let quote = null;
+    for (let i = start; i < str.length; i++) {
+      const c = str[i];
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (inString) {
+        if (c === "\\" && quote === '"') escape = true;
+        else if (c === quote) inString = false;
+        continue;
+      }
+      if (c === '"' || c === "'") {
+        inString = true;
+        quote = c;
+        continue;
+      }
+      if (c === "{") depth++;
+      else if (c === "}") {
+        depth--;
+        if (depth === 0) return str.slice(start, i + 1);
+      }
+    }
+    return str.slice(start);
+  }
+
+  /** Extrae y normaliza JSON del texto de respuesta de la IA. */
   function extractJsonFromResponse(text) {
-    const trimmed = text.trim();
+    if (!text || typeof text !== "string") return "";
+    let trimmed = text.trim();
+    // Bloques de código: ```json ... ``` o ``` ... ```
     const codeBlockMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (codeBlockMatch) return codeBlockMatch[1].trim();
-    const first = trimmed.indexOf("{");
-    const last = trimmed.lastIndexOf("}");
-    if (first !== -1 && last !== -1 && last > first) return trimmed.slice(first, last + 1);
+    if (codeBlockMatch) trimmed = codeBlockMatch[1].trim();
+    else trimmed = extractRootJson(trimmed);
+    // Quitar comas finales antes de } o ] (inválidas en JSON pero a veces devueltas por la IA)
+    trimmed = trimmed.replace(/,(\s*[}\]])/g, "$1");
     return trimmed;
   }
+
+  /** Intenta cerrar JSON truncado (cuenta { [ } ] fuera de strings y añade los cierres que falten). */
+  function tryRepairTruncatedJson(str) {
+    let depthBraces = 0;
+    let depthBrackets = 0;
+    let inString = false;
+    let escape = false;
+    let quote = null;
+    for (let i = 0; i < str.length; i++) {
+      const c = str[i];
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (inString) {
+        if (c === "\\" && quote === '"') escape = true;
+        else if (c === quote) inString = false;
+        continue;
+      }
+      if (c === '"' || c === "'") {
+        inString = true;
+        quote = c;
+        continue;
+      }
+      if (c === "{") depthBraces++;
+      else if (c === "}") depthBraces--;
+      else if (c === "[") depthBrackets++;
+      else if (c === "]") depthBrackets--;
+    }
+    const suffix = "]".repeat(Math.max(0, depthBrackets)) + "}".repeat(Math.max(0, depthBraces));
+    return suffix ? str + suffix : str;
+  }
+
+  /** Campos permitidos en data de proyecto (evita enviar claves extra que puedan dar 400). */
+  const PROYECTO_DATA_KEYS = [
+    "nombre", "descripcion", "cliente_id", "tareas", "presupuesto", "moneda",
+    "tipo_presupuesto", "frecuencia_recurrencia", "numero_cuotas",
+    "fecha_inicio_primer_pago", "fechas_cobro_personalizadas", "miembro_ids"
+  ];
 
   /** Aplica una instrucción al proyecto entero: envía entity + instrucción a IA y actualiza el proyecto. */
   async function aplicarInstruccionAlProyecto() {
@@ -417,21 +523,72 @@ export function ProyectoDetail() {
       .filter(Boolean)
       .join("\n\n");
 
-    const systemPrompt = `Eres un asistente que actualiza proyectos. Recibes un proyecto como JSON (objeto "data" de la entidad) y una instrucción en texto. Debes aplicar la instrucción al proyecto: actualizar descripción, tareas, prioridades, presupuesto o lo que la instrucción indique. La descripción debe ser visión actualizada, máximo 5 párrafos; si algo está obsoleto, bórralo.
-Estructura del proyecto: nombre (string), descripcion (string|null, Markdown), cliente_id (uuid|null), tareas (array de { id, nombre, completada, fecha_inicio, fecha_fin, created_at }), presupuesto (number|null), moneda (string), tipo_presupuesto, frecuencia_recurrencia, numero_cuotas, fecha_inicio_primer_pago, fechas_cobro_personalizadas (array), miembro_ids (array de uuid).
-Responde ÚNICAMENTE con el objeto JSON del proyecto actualizado (solo el objeto data). No cambies los id de las tareas existentes. Mantén cliente_id y miembro_ids como UUIDs válidos o null/array. Fechas en YYYY-MM-DD. Sin explicaciones ni texto antes o después del JSON.`;
+    // Contexto del cliente asociado (nombre y datos) para la IA; no modifica cliente_id al guardar
+    const clienteContext =
+      proyecto.clientes
+        ? `\n\nCliente asociado al proyecto (solo contexto):\nNombre: ${proyecto.clientes.nombre}\nDatos del cliente (JSON):\n${JSON.stringify(
+            {
+              nombre: proyecto.clientes.nombre,
+              tipo_cliente: proyecto.clientes.tipo_cliente ?? null,
+              descripcion: proyecto.clientes.descripcion ?? null,
+              equipo: proyecto.clientes.equipo ?? [],
+            },
+            null,
+            2
+          )}\n`
+        : "\n\nCliente asociado: ninguno.\n";
 
-    const userMessage = `Proyecto actual (JSON):\n${JSON.stringify(projectData, null, 2)}\n\n---\n\nInstrucción a aplicar:\n\n${contenidoInstruccion}`;
+    const systemPrompt = `${AGENTS_CONTEXT}
+
+---
+
+Eres un asistente que actualiza proyectos. Recibes un proyecto como JSON (objeto "data" de la entidad) y una instrucción en texto. Debes aplicar la instrucción al proyecto: actualizar descripción, tareas, prioridades, presupuesto o lo que la instrucción indique.
+
+IMPORTANTE - Descripción en Markdown: El campo descripcion se muestra renderizado como Markdown. Escribe la descripción usando encabezados (##, ###), listas (- o 1.), **negrita**, *cursiva*. Máximo 3-4 párrafos cortos para que la respuesta quepa en el límite.
+
+CRÍTICO - JSON válido: Responde ÚNICAMENTE con el objeto JSON completo (solo el objeto data), sin pasos de razonamiento ni texto antes o después. No dejes strings sin cerrar: en valores string usa \\n para saltos de línea y escapa comillas con \\". No cambies los id de las tareas existentes. Mantén cliente_id y miembro_ids como UUIDs válidos o null/array. Fechas en YYYY-MM-DD.`;
+
+    const userMessage = `Proyecto actual (JSON):\n${JSON.stringify(projectData, null, 2)}${clienteContext}\n---\n\nInstrucción a aplicar:\n\n${contenidoInstruccion}`;
 
     try {
       setImportingInstruccion(true);
-      const rawResponse = await queryDeepSeek(systemPrompt, userMessage);
+      // Modelo con mayor contexto de salida para evitar truncar el JSON del proyecto
+      const rawResponse = await queryDeepSeek(systemPrompt, userMessage, {
+        model: "deepseek-reasoner",
+        max_tokens: 16384,
+      });
       const jsonStr = extractJsonFromResponse(rawResponse);
       let parsedData;
       try {
         parsedData = JSON.parse(jsonStr);
       } catch (e) {
-        throw new Error("La respuesta no es un JSON válido. Intenta de nuevo.");
+        const errMsg = e?.message || "";
+        const isTruncated = errMsg.includes("end of JSON input") || errMsg.includes("Unexpected end");
+        const isUnterminatedString = errMsg.includes("Unterminated string");
+
+        if (isTruncated) {
+          const repaired = tryRepairTruncatedJson(jsonStr);
+          try {
+            parsedData = JSON.parse(repaired);
+          } catch (e2) {
+            console.warn("Reparación de JSON truncado falló:", e2?.message);
+          }
+        }
+        // String sin cerrar (respuesta cortada en medio de un valor): cerrar comilla y llaves/corchetes
+        if (!parsedData && isUnterminatedString) {
+          const withClosedString = tryRepairTruncatedJson(jsonStr + '"');
+          try {
+            parsedData = JSON.parse(withClosedString);
+          } catch (e2) {
+            console.warn("Reparación de string sin cerrar falló:", e2?.message);
+          }
+        }
+        if (!parsedData) {
+          const snippet = jsonStr.length > 200 ? `${jsonStr.slice(0, 200)}…` : jsonStr;
+          console.warn("Respuesta IA (extraído):", jsonStr.slice(0, 800));
+          console.warn("Error de parse:", e?.message);
+          throw new Error(`La respuesta no es un JSON válido (${errMsg || "parse error"}). Intenta de nuevo. Fragmento: ${snippet}`);
+        }
       }
       if (typeof parsedData !== "object" || parsedData === null) {
         throw new Error("La respuesta no es un objeto válido.");
@@ -439,15 +596,41 @@ Responde ÚNICAMENTE con el objeto JSON del proyecto actualizado (solo el objeto
       if (parsedData.tareas != null && !Array.isArray(parsedData.tareas)) {
         throw new Error("El campo tareas debe ser un array.");
       }
-      await proyectosApi.update(id, parsedData);
+      // Mantener título y cliente; solo enviar campos permitidos del proyecto (evita 400 por claves extra)
+      const filtered = {};
+      PROYECTO_DATA_KEYS.forEach((k) => {
+        if (parsedData[k] !== undefined) filtered[k] = parsedData[k];
+      });
+      const dataToSave = {
+        ...filtered,
+        nombre: proyecto.nombre,
+        cliente_id: proyecto.cliente_id ?? null,
+      };
+      await proyectosApi.update(id, dataToSave);
+      setAppliedInstruccion(instruccion);
       setSelectedInstruccionId("");
       await loadProyecto();
       setShowAplicarInstruccionDialog(false);
+      setShowDeleteInstruccionDialog(true);
     } catch (err) {
       console.error("Error al aplicar instrucción:", err);
       alert(err?.message || `No se pudo aplicar la instrucción: ${err}`);
     } finally {
       setImportingInstruccion(false);
+    }
+  }
+
+  async function confirmDeleteInstruccion() {
+    if (!appliedInstruccion) return;
+    try {
+      await instruccionesApi.remove(appliedInstruccion.id);
+      setInstrucciones((prev) => prev.filter((i) => i.id !== appliedInstruccion.id));
+    } catch (err) {
+      console.error("Error al eliminar instrucción:", err);
+      alert(err?.message || "No se pudo eliminar la instrucción.");
+    } finally {
+      setShowDeleteInstruccionDialog(false);
+      setAppliedInstruccion(null);
     }
   }
 
@@ -1553,8 +1736,8 @@ Responde SOLO con el JSON array, sin explicaciones adicionales.`;
                     className="shrink-0"
                     onClick={() => (recordingDescripcion ? stopRecordingDescripcion() : startRecordingDescripcion())}
                     disabled={saving || transcribingDescripcion}
-                    title={recordingDescripcion ? "Parar grabación" : transcribingDescripcion ? "Transcribiendo..." : "Grabar con voz y añadir a la descripción"}
-                    aria-label={recordingDescripcion ? "Parar grabación" : "Grabar con voz"}
+                    title={recordingDescripcion ? "Parar grabación" : transcribingDescripcion ? "Transcribiendo..." : "Editar con voz: la transcripción se combina con la descripción actual"}
+                    aria-label={recordingDescripcion ? "Parar grabación" : "Editar con voz"}
                   >
                     {transcribingDescripcion ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -1563,7 +1746,7 @@ Responde SOLO con el JSON array, sin explicaciones adicionales.`;
                     ) : (
                       <Mic className="h-4 w-4" />
                     )}
-                    {!isMobile && (transcribingDescripcion ? " Transcribiendo..." : recordingDescripcion ? " Parar" : " Grabar con voz")}
+                    {!isMobile && (transcribingDescripcion ? " Transcribiendo..." : recordingDescripcion ? " Parar" : " Editar con voz")}
                   </Button>
                 </div>
                 <textarea
@@ -1574,9 +1757,6 @@ Responde SOLO con el JSON array, sin explicaciones adicionales.`;
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-y font-mono"
                   disabled={saving}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Puedes usar Markdown para formatear el texto. También puedes grabar con el micrófono y se añadirá la transcripción.
-                </p>
                 <div className="flex gap-2">
                   <Button
                     onClick={updateDescripcion}
@@ -2149,6 +2329,53 @@ Responde SOLO con el JSON array, sin explicaciones adicionales.`;
                       Aplicar al proyecto
                     </>
                   )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Diálogo Eliminar instrucción (después de aplicar) */}
+      {showDeleteInstruccionDialog && appliedInstruccion && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Trash2 className="h-5 w-5" />
+                  Eliminar instrucción
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    setShowDeleteInstruccionDialog(false);
+                    setAppliedInstruccion(null);
+                  }}
+                  title="Cerrar"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-muted-foreground">
+                La instrucción "{appliedInstruccion.titulo || "Sin título"}" se aplicó correctamente al proyecto. ¿Quieres eliminarla?
+              </p>
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowDeleteInstruccionDialog(false);
+                    setAppliedInstruccion(null);
+                  }}
+                >
+                  Conservar
+                </Button>
+                <Button variant="destructive" onClick={confirmDeleteInstruccion}>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Eliminar
                 </Button>
               </div>
             </CardContent>
